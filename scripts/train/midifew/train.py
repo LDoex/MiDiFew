@@ -11,10 +11,10 @@ import torch.optim.lr_scheduler as lr_scheduler
 import torchvision
 import torchnet as tnt
 
-#from protonets.engine import Engine
+from MiDiFewNets.engine import Engine
 
 import MiDiFewNets.utils.data as data_utils
-#import MiDiFewNets.utils.model as model_utils
+import MiDiFewNets.utils.model as model_utils
 import MiDiFewNets.utils.log as log_utils
 
 def main(opt):
@@ -44,3 +44,55 @@ def main(opt):
         data = data_utils.load(opt, ['train', 'val'])
         train_loader = data['train']
         val_loader = data['val']
+
+    model = model_utils.load(opt)
+
+
+    engine = Engine()
+
+    meters = {'train': {field: tnt.meter.AverageValueMeter() for field in opt['log.fields']}}
+
+    if val_loader is not None:
+        meters['val'] = {field: tnt.meter.AverageValueMeter() for field in opt['log.fields']}
+
+    def on_start(state):
+        if os.path.isfile(trace_file):
+            os.remove(trace_file)
+        state['scheduler'] = lr_scheduler.StepLR(state['optimizer'], opt['train.decay_every'], gamma=0.5)
+    engine.hooks['on_start'] = on_start
+
+    def on_start_epoch(state):
+        for split, split_meters in meters.items():
+            for field, meter in split_meters.items():
+                meter.reset()
+        state['scheduler'].step()
+    engine.hooks['on_start_epoch'] = on_start_epoch
+
+    def on_update(state):
+        for field, meter in meters['train'].items():
+            meter.add(state['output'][field])
+    engine.hooks['on_update'] = on_update
+
+    def on_end_epoch(hook_state, state):
+        if val_loader is not None:
+            if 'best_loss' not in hook_state:
+                hook_state['best_loss'] = np.inf
+            if 'wait' not in hook_state:
+                hook_state['wait'] = 0
+
+        if val_loader is not None:
+            model_utils.evaluate(state['model'],
+                                 val_loader,
+                                 meters['val'],
+                                 desc="Epoch {:d} valid".format(state['epoch']))
+
+    meter_vals = log_utils.extract_meter_values(meters)
+
+    engine.train(
+        model=model,
+        loader=train_loader,
+        optim_method=getattr(optim, opt['train.optim_method']),
+        optim_config={'lr': opt['train.learning_rate'],
+                      'weight_decay': opt['train.weight_decay']},
+        max_epoch=opt['train.epochs']
+    )

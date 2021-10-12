@@ -71,25 +71,25 @@ def load(opt, splits):
             n_episodes = opt['data.train_episodes']
 
 
-    transforms = [partial(convert_dict, 'class'),
-                  load_class_data,
-                  partial(extract_episode, n_support, n_query)]
+        transforms = [partial(convert_dict, 'class'),
+                      load_class_data,
+                      partial(extract_episode, n_support, n_query)]
 
-    if opt['data.cuda']:
-        transforms.append(CudaTransform())
+        if opt['data.cuda']:
+            transforms.append(CudaTransform())
 
-    transforms = compose(transforms)
+        transforms = compose(transforms)
 
-    class_names = []
+        class_names = []
 
-    with open(os.path.join(split_dir, "{:s}.txt".format(split)), 'r') as f:
-        for class_name in f.readlines():
-            class_names.append(class_name.rstrip('\n'))
-    ds = TransformDataset(ListDataset(class_names), transforms)
+        with open(os.path.join(split_dir, "{:s}.txt".format(split)), 'r') as f:
+            for class_name in f.readlines():
+                class_names.append(class_name.rstrip('\n'))
+        ds = TransformDataset(ListDataset(class_names), transforms)
 
-    sampler = MyBatchSampler(len(ds))
+        sampler = MyBatchSampler(len(ds), n_way, n_episodes)
 
-    # use num_workers=0, otherwise may receive duplicate episodes
-    ret[split] = torch.utils.data.DataLoader(ds, batch_sampler=sampler, num_workers=0)
+        # use num_workers=0, otherwise may receive duplicate episodes
+        ret[split] = torch.utils.data.DataLoader(ds, batch_sampler=sampler, num_workers=0)
 
     return ret
