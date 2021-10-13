@@ -14,16 +14,25 @@ class Flatten(nn.Module):
     def forward(self, x):
         return x.view(x.size(0),-1)
 
-class midifewNet(nn.Module):
+class midifewNet2d(nn.Module):
     def __init__(self, encoder):
-        super(midifewNet, self).__init__()
+        super(midifewNet2d, self).__init__()
+        self.encoder = encoder
+
+    def loss(self, sample):
+        #计算最终loss并返回
+        pass
+
+class midifewNet1d(nn.Module):
+    def __init__(self, encoder):
+        super(midifewNet1d, self).__init__()
         self.encoder = encoder
 
     def loss(self, sample):
         pass
 
-@register_model('protonet_conv')
-def load_protonet_conv(**kwargs):
+@register_model('protonet_conv1d')
+def load_protonet_conv1d(**kwargs):
     x_dim = kwargs['x_dim']
     hid_dim = kwargs['hid_dim']
     z_dim = kwargs['z_dim']
@@ -41,4 +50,25 @@ def load_protonet_conv(**kwargs):
         Flatten()
     )
 
-    return midifewNet(encoder)
+    return midifewNet1d(encoder)
+
+@register_model('protonet_conv2d')
+def load_protonet_conv2d(**kwargs):
+    x_dim = kwargs['x_dim']
+    hid_dim = kwargs['hid_dim']
+    z_dim = kwargs['z_dim']
+
+    def conv2d_block(in_channels, out_channels):
+        return nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(),
+            nn.MaxPool2d(2)
+        )
+
+    encoder = nn.Sequential(
+        conv2d_block(x_dim[0], 64),
+        Flatten()
+    )
+
+    return midifewNet2d(encoder)

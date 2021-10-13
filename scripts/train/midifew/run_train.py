@@ -32,7 +32,7 @@ parser.add_argument('--data.trainval', action='store_true', default=False, help=
 parser.add_argument('--data.cuda', action='store_true', default=False, help="run in CUDA mode (default: False)")
 
 # model args
-default_model_name = 'protonet_conv'
+default_model_name = 'protonet_conv1d'
 parser.add_argument('--model.model_name', type=str, default=default_model_name, metavar='MODELNAME',
                     help="model name (default: {:s})".format(default_model_name))
 parser.add_argument('--model.x_dim', type=str, default='1,11,11', metavar='XDIM',

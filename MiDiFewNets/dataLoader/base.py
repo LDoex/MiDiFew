@@ -27,8 +27,12 @@ class MyBatchSampler(object):
         return self.n_episodes
 
     def __iter__(self):
-        for i in range(self.n_classes):
-            yield torch.cat(torch.zeros(1).long, torch.LongTensor([i]))
+        for i in range(self.n_episodes):
+            yield torch.cat((torch.zeros(1).long(),
+                             # torch.ones(1).long(),
+                             torch.from_numpy
+                             (np.array
+                              (random.sample(range(1, self.n_classes), self.n_way - 1))).long()))
 
 class EpisodicBatchSampler(object):
     def __init__(self, n_classes, n_way, n_episodes):

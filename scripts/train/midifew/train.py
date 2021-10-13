@@ -17,6 +17,7 @@ import MiDiFewNets.utils.data as data_utils
 import MiDiFewNets.utils.model as model_utils
 import MiDiFewNets.utils.log as log_utils
 
+
 def main(opt):
     if not os.path.isdir(opt['log.exp_dir']):
         os.makedirs(opt['log.exp_dir'])
