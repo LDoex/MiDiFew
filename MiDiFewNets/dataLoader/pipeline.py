@@ -6,15 +6,28 @@ import torch
 import csv
 from torchnet.dataset import ListDataset, TransformDataset
 from torchnet.transform import compose
+from torch.utils.data import Dataset
 
 from MiDiFewNets.dataLoader.base import convert_dict, CudaTransform, EpisodicBatchSampler, MyBatchSampler
 import numpy as np
+class myDataset(Dataset):
+    def __init__(self, data_dir):
+        data = np.array(pd.read_csv(data_dir).values[:, :324])
+        self.len = data.shape[0]
+        self.x = torch.from_numpy(data[:,:])
+
+    def __len__(self):
+        return self.len
+
+    def __getitem__(self, index):
+        return self.x[index]
+
+
+
 
 Pipeline_CACHE = {}
 DATA_DIR = os.path.join(os.path.dirname(__file__), '../../Data/pipeline')
 
-def data_prepro(key, out_field, d):
-    pass
 
 def extract_episode(n_support, n_query, d):
     pass
@@ -32,16 +45,14 @@ def load_class_data(d):
     data_dir = os.path.join(DATA_DIR, alphabet, '0.csv')
 
     #读入数据
-    class_data = np.array(pd.read_csv(data_dir).values[:, :324])
+    class_data = myDataset(data_dir)
 
     if len(class_data) == 0:
         raise Exception("No data found for omniglot class {} at {}.".format(d['class'], data_dir))
 
 
-    myDs = myDataset()
-    data_ds = TransformDataset(ListDataset(class_data),
+    data_ds = TransformDataset(class_data,
                                compose([partial(convert_dict, 'file_name'),
-                                        partial(data_prepro, 'file_name', 'data'),
                                         partial(scale_data, 'data', 18, 18),
                                         partial(convert_tensor, 'data')]))
 
