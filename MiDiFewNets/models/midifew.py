@@ -2,9 +2,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+import csv
 from torch.autograd import Variable
 from sklearn.metrics import accuracy_score,recall_score,precision_score,f1_score
 from MiDiFewNets.models import register_model
+
+from .utils import euclidean_dist
+from .utils import CosineMarginLoss
 
 class Flatten(nn.Module):
     def __init__(self):
@@ -29,7 +33,60 @@ class midifewNet1d(nn.Module):
         self.encoder = encoder
 
     def loss(self, sample):
-        pass
+        xs = Variable(sample['xs'])  # support
+        xq = Variable(sample['xq'])  # query
+
+        n_class = xs.size(0)
+        assert xq.size(0) == n_class
+        n_support = xs.size(1)
+        n_query = xq.size(1)
+
+        target_inds = torch.arange(0, n_class).view(n_class, 1, 1).expand(n_class, n_query, 1).long()
+        target_inds = Variable(target_inds, requires_grad=False)
+
+        if xq.is_cuda:
+            target_inds = target_inds.cuda()
+
+        x = torch.cat([xs.view(n_class * n_support, *xs.size()[2:]),
+                       xq.view(n_class * n_query, *xq.size()[2:])], 0)
+
+        z = self.encoder.forward(x)
+        # save z into txt
+        result = np.array(z.cpu().detach().numpy())
+        rows = []
+        for i in range(result.shape[0]):
+            rows.append(result[i])
+        file = open("result.csv", 'w')
+        writer = csv.writer(file, delimiter=',', lineterminator='\n')
+        writer.writerows(rows)
+        file.close()
+        # np.savetxt('npresult1.csv', result, delimiter=',',  fmt=['%s']*result.shape[1], newline='\n')
+
+        z_dim = z.size(-1)
+
+        z_proto = z[:n_class * n_support].view(n_class, n_support, z_dim).mean(1)
+        zq = z[n_class * n_support:]
+
+        dists = euclidean_dist(zq, z_proto)
+
+        log_p_y = F.log_softmax(-dists, dim=1).view(n_class, n_query, -1)
+
+        CML = CosineMarginLoss(embed_dim=z_dim, num_classes=n_class, isCUDA=xq.is_cuda)
+
+        loss_cml = CML.loss(x=zq, labels=target_inds.squeeze())
+
+        loss_log = -log_p_y.gather(2, target_inds).squeeze().view(-1).mean()
+
+        loss_val = loss_log + 0.01 * loss_cml
+
+        _, y_hat = log_p_y.max(2)
+        acc_val = torch.eq(y_hat, target_inds.squeeze()).float().mean()
+
+        return loss_val, {
+            'loss': loss_val.item(),
+            'acc': acc_val.item()
+        }
+
 
 @register_model('protonet_conv1d')
 def load_protonet_conv1d(**kwargs):
@@ -39,7 +96,7 @@ def load_protonet_conv1d(**kwargs):
 
     def conv1d_block(in_channels, out_channels):
         return nn.Sequential(
-            nn.Conv1d(in_channels, out_channels, kernel_size=1),
+            nn.Conv1d(in_channels, out_channels, kernel_size=3),
             nn.BatchNorm1d(out_channels),
             nn.ReLU(),
             nn.MaxPool1d(2)

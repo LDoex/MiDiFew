@@ -49,7 +49,7 @@ def extract_episode(n_support, n_query, d):
     }
 
 def convert_tensor(key, d):
-    d[key] = 1.0 - torch.from_numpy(np.array(d[key], np.float32, copy=False)).transpose(0, 1).contiguous().view(1, d[key].shape[0], d[key].shape[1])
+    d[key] = 1.0 - torch.from_numpy(np.array(d[key], np.float32, copy=False)).transpose(0, 1).contiguous().view(d[key].shape[0], d[key].shape[1])
     return d
 
 def scale_data(key, d):
