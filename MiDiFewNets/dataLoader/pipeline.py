@@ -30,14 +30,30 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), '../../Data/pipeline')
 
 
 def extract_episode(n_support, n_query, d):
-    pass
+    n_examples = d['data'].size(0)
+
+    if n_query == -1:
+        n_query = n_examples - n_support
+
+    example_inds = torch.randperm(n_examples)[:n_support+n_query]
+    support_inds = example_inds[:n_support]
+    query_inds = example_inds[n_support:]
+
+    xs = d['data'][support_inds]
+    xq = d['data'][query_inds]
+
+    return {
+        'class': d['class'],
+        'xs': xs,
+        'xq': xq
+    }
 
 def convert_tensor(key, d):
     d[key] = 1.0 - torch.from_numpy(np.array(d[key], np.float32, copy=False)).transpose(0, 1).contiguous().view(1, d[key].shape[0], d[key].shape[1])
     return d
 
-def scale_data(key, height, width, d):
-    d[key] = d[key].reshape((height,width))
+def scale_data(key, d):
+    d[key] = d[key].reshape((1, d[key].shape[0]))
     return d
 
 def load_class_data(d):
@@ -52,11 +68,11 @@ def load_class_data(d):
 
 
     data_ds = TransformDataset(class_data,
-                               compose([partial(convert_dict, 'file_name'),
-                                        partial(scale_data, 'data', 18, 18),
+                               compose([partial(convert_dict, 'data'),
+                                        partial(scale_data, 'data'),
                                         partial(convert_tensor, 'data')]))
 
-    loader = torch.utils.data.DataLoader(data_ds, batch_size=len(data_ds), shuffle=False)
+    loader = torch.utils.data.DataLoader(data_ds, batch_size=10, shuffle=False)
     for sample in loader:
         Pipeline_CACHE[d['class']] = sample['data']
         break  # only need one sample because batch size equal to dataset length
