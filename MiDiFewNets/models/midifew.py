@@ -14,7 +14,6 @@ class Flatten(nn.Module):
     def __init__(self):
         super(Flatten, self).__init__()
 
-
     def forward(self, x):
         return x.view(x.size(0),-1)
 
@@ -71,20 +70,30 @@ class midifewNet1d(nn.Module):
 
         log_p_y = F.log_softmax(-dists, dim=1).view(n_class, n_query, -1)
 
-        CML = CosineMarginLoss(embed_dim=z_dim, num_classes=n_class, isCUDA=xq.is_cuda)
-
-        loss_cml = CML.loss(x=zq, labels=target_inds.squeeze())
-
         loss_log = -log_p_y.gather(2, target_inds).squeeze().view(-1).mean()
 
-        loss_val = loss_log + 0.01 * loss_cml
+        loss_val = loss_log
 
         _, y_hat = log_p_y.max(2)
         acc_val = torch.eq(y_hat, target_inds.squeeze()).float().mean()
 
+        y_re = target_inds.squeeze()
+
+        y_real = np.array(y_re.cpu()).reshape(-1)
+        y_pred = np.array(y_hat.cpu()).reshape(-1)
+        acc = accuracy_score(y_real, y_pred)  # TP+TN/(TP+FN+FP+TN)
+        pre = precision_score(y_real, y_pred, average='macro')  # TP/TP+FP
+        rec = recall_score(y_real, y_pred, average='macro')  # TP/TP+FN
+        F1s = f1_score(y_real, y_pred, average='macro')  # 2*(pre*recall/(pre+recall))
+        # F1s, pre, rec, TP = f_score(y_real, y_pred)
+
         return loss_val, {
             'loss': loss_val.item(),
-            'acc': acc_val.item()
+            'acc': acc_val.item(),
+            'Accuracy': acc,
+            'Precision': pre,
+            'Recall': rec,
+            'F1': F1s
         }
 
 
