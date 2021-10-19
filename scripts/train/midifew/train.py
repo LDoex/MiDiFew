@@ -87,7 +87,37 @@ def main(opt):
                                  meters['val'],
                                  desc="Epoch {:d} valid".format(state['epoch']))
 
-    meter_vals = log_utils.extract_meter_values(meters)
+        meter_vals = log_utils.extract_meter_values(meters)
+        print("Epoch {:02d}: {:s}".format(state['epoch'], log_utils.render_meter_values(meter_vals)))
+        meter_vals['epoch'] = state['epoch']
+        with open(trace_file, 'a') as f:
+            json.dump(meter_vals, f)
+            f.write('\n')
+
+        if val_loader is not None:
+            if meter_vals['val']['loss'] < hook_state['best_loss']:
+                hook_state['best_loss'] = meter_vals['val']['loss']
+                print("==> best model (loss = {:0.6f}), saving model...".format(hook_state['best_loss']))
+
+                state['model'].cpu()
+                torch.save(state['model'], os.path.join(opt['log.exp_dir'], 'best_model.pt'))
+                if opt['data.cuda']:
+                    state['model'].cuda()
+
+                hook_state['wait'] = 0
+            else:
+                hook_state['wait'] += 1
+
+                if hook_state['wait'] > opt['train.patience']:
+                    print("==> patience {:d} exceeded".format(opt['train.patience']))
+                    state['stop'] = True
+        else:
+            state['model'].cpu()
+            torch.save(state['model'], os.path.join(opt['log.exp_dir'], 'best_model.pt'))
+            if opt['data.cuda']:
+                state['model'].cuda()
+
+    engine.hooks['on_end_epoch'] = partial(on_end_epoch, {})
 
     engine.train(
         model=model,
