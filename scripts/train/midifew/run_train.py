@@ -11,11 +11,11 @@ parser.add_argument('--data.dataset', type=str, default=default_dataset, metavar
 default_split = 'vinyals'
 parser.add_argument('--data.split', type=str, default=default_split, metavar='SP',
                     help="split name (default: {:s})".format(default_split))
-parser.add_argument('--data.way', type=int, default=3, metavar='WAY',
+parser.add_argument('--data.way', type=int, default=2, metavar='WAY',
                     help="number of classes per episode (default: 60)")
 parser.add_argument('--data.shot', type=int, default=5, metavar='SHOT',
                     help="number of support examples per class (default: 5)")
-parser.add_argument('--data.query', type=int, default=5, metavar='QUERY',
+parser.add_argument('--data.query', type=int, default=15, metavar='QUERY',
                     help="number of query examples per class (default: 5)")
 parser.add_argument('--data.test_way', type=int, default=2, metavar='TESTWAY',
                     help="number of classes per episode in test. 0 means same as data.way (default: 5)")
@@ -47,7 +47,7 @@ parser.add_argument('--train.epochs', type=int, default=1000, metavar='NEPOCHS',
                     help='number of epochs to train (default: 10000)')
 parser.add_argument('--train.optim_method', type=str, default='Adam', metavar='OPTIM',
                     help='optimization method (default: Adam)')
-parser.add_argument('--train.learning_rate', type=float, default=0.0001, metavar='LR',
+parser.add_argument('--train.learning_rate', type=float, default=0.4, metavar='LR',
                     help='learning rate (default: 0.0001)')
 parser.add_argument('--train.decay_every', type=int, default=20, metavar='LRDECAY',
                     help='number of epochs after which to decay the learning rate')

@@ -113,6 +113,8 @@ def load_protonet_conv1d(**kwargs):
 
     encoder = nn.Sequential(
         conv1d_block(x_dim[0], 64),
+        conv1d_block(64, 32),
+        conv1d_block(32, 32),
         Flatten()
     )
 
