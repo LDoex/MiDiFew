@@ -35,11 +35,11 @@ parser.add_argument('--data.cuda', action='store_true', default=False, help="run
 default_model_name = 'protonet_conv1d'
 parser.add_argument('--model.model_name', type=str, default=default_model_name, metavar='MODELNAME',
                     help="model name (default: {:s})".format(default_model_name))
-parser.add_argument('--model.x_dim', type=str, default='1,11,11', metavar='XDIM',
+parser.add_argument('--model.x_dim', type=str, default='324,11,11', metavar='XDIM',
                     help="dimensionality of input images (default: '1,28,28')")
-parser.add_argument('--model.hid_dim', type=int, default=64, metavar='HIDDIM',
+parser.add_argument('--model.hid_dim', type=int, default=128, metavar='HIDDIM',
                     help="dimensionality of hidden layers (default: 64)")
-parser.add_argument('--model.z_dim', type=int, default=32, metavar='ZDIM',
+parser.add_argument('--model.z_dim', type=int, default=64, metavar='ZDIM',
                     help="dimensionality of input images (default: 64)")
 
 # train args
