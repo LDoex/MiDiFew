@@ -26,7 +26,5 @@ Train_dir = './csvData/TrainClassData/'
 Test_dir = './csvData/TestClassData/'
 splitByClass.split(dirName=Train_dir, fileType="TrainClass",
                    classList=Train_label_count, data=Train_data)
-
-
-
-
+splitByClass.split(dirName=Test_dir, fileType='TestData',
+                   classList=Test_label_count, data=Test_data)
