@@ -11,6 +11,7 @@ class Engine(object):
 
     def train(self, **kwargs):
         state = {
+            'teacher_moder': kwargs['teacher_model'],
             'model': kwargs['model'],
             'loader': kwargs['loader'],
             'optim_method': kwargs['optim_method'],
@@ -37,7 +38,8 @@ class Engine(object):
                 self.hooks['on_sample'](state)
 
                 state['optimizer'].zero_grad()
-                loss, state['output'] = state['model'].loss(state['sample'])
+                loss, state['output'] = state['model'].loss(sample=state['sample'],
+                                                            teacher_model=state['teacher_moder'])
                 self.hooks['on_forward'](state)
 
                 loss.backward()
