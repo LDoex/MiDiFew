@@ -26,7 +26,7 @@ class myDataset(Dataset):
 
 
 Pipeline_CACHE = {}
-DATA_DIR = os.path.join(os.path.dirname(__file__), '../../Data/pipeline')
+DATA_DIR = os.path.join(os.path.dirname(__file__), '../../Data/kdd')
 
 
 def extract_episode(n_support, n_query, d):
@@ -54,12 +54,13 @@ def convert_tensor(key, d):
     return d
 
 def scale_data(key, d):
-    d[key] = d[key].reshape((d[key].shape[0], 1))
+    d[key] = d[key][:-1]
+    d[key] = d[key].reshape(1, (d[key].shape[0]))
     return d
 
 def load_class_data(d):
     alphabet = d['class']
-    data_dir = os.path.join(DATA_DIR, alphabet, '0.csv')
+    data_dir = os.path.join(DATA_DIR, alphabet,alphabet+'.csv')
 
     #读入数据
     class_data = myDataset(data_dir)

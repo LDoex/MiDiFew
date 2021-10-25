@@ -82,9 +82,9 @@ class midifewNet1d(nn.Module):
         y_real = np.array(y_re.cpu()).reshape(-1)
         y_pred = np.array(y_hat.cpu()).reshape(-1)
         acc = accuracy_score(y_real, y_pred)  # TP+TN/(TP+FN+FP+TN)
-        pre = precision_score(y_real, y_pred, average='macro')  # TP/TP+FP
-        rec = recall_score(y_real, y_pred, average='macro')  # TP/TP+FN
-        F1s = f1_score(y_real, y_pred, average='macro')  # 2*(pre*recall/(pre+recall))
+        pre = precision_score(y_real, y_pred, average='binary')  # TP/TP+FP
+        rec = recall_score(y_real, y_pred, average='binary')  # TP/TP+FN
+        F1s = f1_score(y_real, y_pred, average='binary')  # 2*(pre*recall/(pre+recall))
         # F1s, pre, rec, TP = f_score(y_real, y_pred)
 
         return loss_val, {
@@ -103,7 +103,14 @@ def load_protonet_conv1d(**kwargs):
     hid_dim = kwargs['hid_dim']
     z_dim = kwargs['z_dim']
 
-    def conv1d_block(in_channels, out_channels):
+    def conv1d_block_3(in_channels, out_channels):
+        return nn.Sequential(
+            nn.Conv1d(in_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU(),
+            nn.MaxPool1d(2)
+        )
+    def conv1d_block_5(in_channels, out_channels):
         return nn.Sequential(
             nn.Conv1d(in_channels, out_channels, kernel_size=3, padding=2),
             nn.BatchNorm1d(out_channels),
@@ -112,7 +119,9 @@ def load_protonet_conv1d(**kwargs):
         )
 
     encoder = nn.Sequential(
-        conv1d_block(x_dim[0], 128),
+        conv1d_block_5(x_dim[0], 64),
+        conv1d_block_3(64, 64),
+        conv1d_block_3(64, 32),
         Flatten()
     )
 
