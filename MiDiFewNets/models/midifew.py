@@ -69,7 +69,9 @@ class midifewNet1d_teacher(nn.Module):
 
         dists = euclidean_dist(zq, z_proto)
 
-        log_p_y = F.log_softmax(-dists, dim=1).view(n_class, n_query, -1)
+        log_p_y = F.log_softmax(-dists, dim=1)
+
+        log_p_y = log_p_y.view(n_class, n_query, -1)
 
         loss_log = -log_p_y.gather(2, target_inds).squeeze().view(-1).mean()
 
@@ -143,9 +145,36 @@ class midifewNet1d_student(nn.Module):
 
         log_p_y = F.log_softmax(-dists, dim=1).view(n_class, n_query, -1)
 
-        loss_log = -log_p_y.gather(2, target_inds).squeeze().view(-1).mean()
+        loss_student = -log_p_y.gather(2, target_inds).squeeze().view(-1).mean()
 
-        loss_val = loss_log
+        # distill setting
+        # if teacher_model is exist, setting args
+        if teacher_model is not None:
+            w_teacher = 0.5
+            w_student = 0.5
+            teacher_model.eval()
+            T = 6
+            if xq.is_cuda:
+                teacher_model.cuda()
+
+            teacher_z = teacher_model.encoder.forward(x)
+
+            teacher_z_dim = teacher_z.size(-1)
+
+            teacher_z_proto = teacher_z[:n_class * n_support].view(n_class, n_support, teacher_z_dim).mean(1)
+            teacher_zq = teacher_z[n_class * n_support:]
+
+            teacher_dists = euclidean_dist(teacher_zq, teacher_z_proto)
+
+            soft_label = F.log_softmax(teacher_dists/T, dim=1)
+            student_label = F.log_softmax(dists/T, dim=1)
+
+            loss_ditill = nn.KLDivLoss(reduction="batchmean")(student_label, soft_label) * T * T
+
+            loss_val = loss_ditill * w_teacher + loss_student * w_student
+
+        else:
+            loss_val = loss_student
 
         _, y_hat = log_p_y.max(2)
         acc_val = torch.eq(y_hat, target_inds.squeeze()).float().mean()
@@ -221,9 +250,7 @@ def load_protonet_conv1d(**kwargs):
         )
 
     encoder = nn.Sequential(
-        conv1d_block_5(x_dim[0], 64),
-        conv1d_block_3(64, 64),
-        conv1d_block_3(64, 32),
+        conv1d_block_3(x_dim[0], 32),
         Flatten()
     )
 

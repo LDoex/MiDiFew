@@ -56,6 +56,8 @@ parser.add_argument('--train.weight_decay', type=float, default=default_weight_d
                     help="weight decay (default: {:f})".format(default_weight_decay))
 parser.add_argument('--train.patience', type=int, default=200, metavar='PATIENCE',
                     help='number of epochs to wait before validation improvement (default: 1000)')
+parser.add_argument('--train.idDistill', action='store_true', default=False, metavar='Distill',
+                    help='Knowledge Distill(default: False)')
 
 # log args
 default_fields = 'loss,acc,Precision,Recall,F1'

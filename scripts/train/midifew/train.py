@@ -122,7 +122,7 @@ def main(opt):
 
     engine.hooks['on_end_epoch'] = partial(on_end_epoch, {})
 
-    teacher_model = None if 'student' in best_model_name else os.path.join(opt['log.exp_dir'], 'best_teacher_model.pt')
+    teacher_model = None if 'student' in best_model_name else torch.load(os.path.join(opt['log.exp_dir'], 'best_teacher_model.pt'))
 
     engine.train(
         teacher_model=teacher_model,
