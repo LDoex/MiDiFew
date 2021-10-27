@@ -10,6 +10,17 @@ from MiDiFewNets.models import register_model
 from .utils import euclidean_dist
 from .utils import CosineMarginLoss
 
+class Dropout(nn.Module):
+    def __init__(self):
+        super(Dropout, self).__init__()
+
+
+    def forward(self, input):
+        m = nn.Dropout(0.2)
+        return m(input)
+
+
+# train the Net
 class Flatten(nn.Module):
     def __init__(self):
         super(Flatten, self).__init__()
@@ -220,9 +231,11 @@ def load_protonet_conv1d(**kwargs):
         )
 
     encoder = nn.Sequential(
-        conv1d_block_5(x_dim[0], 64),
-        conv1d_block_3(64, 64),
+        conv1d_block_3(x_dim[0], 64),
         conv1d_block_3(64, 32),
+        conv1d_block_3(32, 32),
+        #Dropout(),
+        conv1d_block_3(32, 32),
         Flatten()
     )
 
@@ -250,7 +263,9 @@ def load_protonet_conv1d(**kwargs):
         )
 
     encoder = nn.Sequential(
-        conv1d_block_3(x_dim[0], 32),
+        conv1d_block_3(x_dim[0], 16),
+        conv1d_block_3(16, 16),
+        conv1d_block_3(16, 16),
         Flatten()
     )
 

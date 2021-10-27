@@ -22,6 +22,7 @@ def main(opt):
     if not os.path.isdir(opt['log.exp_dir']):
         os.makedirs(opt['log.exp_dir'])
 
+
     # save opts
     with open(os.path.join(opt['log.exp_dir'], 'opt.json'), 'w') as f:
         json.dump(opt, f)
@@ -46,7 +47,13 @@ def main(opt):
         train_loader = data['train']
         val_loader = data['val']
 
-    best_model_name = 'best_model.pt' if 'student' in opt['model.model_name'] else 'best_teacher_model.pt'
+    if 'student' in opt['model.model_name']:
+        if opt['train.isDistill'] == False:
+            best_model_name = 'best_model.pt'
+        else:
+            best_model_name = 'best_model_withDistill.pt'
+    else:
+        best_model_name = 'best_teacher_model.pt'
     model = model_utils.load(opt)
 
 
@@ -122,7 +129,7 @@ def main(opt):
 
     engine.hooks['on_end_epoch'] = partial(on_end_epoch, {})
 
-    teacher_model = None if 'student' in best_model_name else torch.load(os.path.join(opt['log.exp_dir'], 'best_teacher_model.pt'))
+    teacher_model = None if 'student' in best_model_name or opt['train.isDistill'] == False else torch.load(os.path.join(opt['log.exp_dir'], 'best_teacher_model.pt'))
 
     engine.train(
         teacher_model=teacher_model,
