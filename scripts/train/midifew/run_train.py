@@ -23,16 +23,16 @@ parser.add_argument('--data.test_shot', type=int, default=5, metavar='TESTSHOT',
                     help="number of support examples per class in test. 0 means same as data.shot (default: 0)")
 parser.add_argument('--data.test_query', type=int, default=5, metavar='TESTQUERY',
                     help="number of query examples per class in test. 0 means same as data.query (default: 15)")
-parser.add_argument('--data.train_episodes', type=int, default=10, metavar='NTRAIN',
+parser.add_argument('--data.train_episodes', type=int, default=2, metavar='NTRAIN',
                     help="number of train episodes per epoch (default: 100)")
-parser.add_argument('--data.test_episodes', type=int, default=10, metavar='NTEST',
+parser.add_argument('--data.test_episodes', type=int, default=2, metavar='NTEST',
                     help="number of test episodes per epoch (default: 100)")
 parser.add_argument('--data.trainval', action='store_true', default=False, help="run in train+validation mode (default: False)")
 #parser.add_argument('--data.sequential', action='store_true', default=False, help="use sequential sampler instead of episodic (default: False)")
 parser.add_argument('--data.cuda', action='store_true', default=False, help="run in CUDA mode (default: False)")
 
 # model args
-default_model_name = 'midifew_teacher_conv1d'
+default_model_name = 'midifew_student_conv1d'
 parser.add_argument('--model.model_name', type=str, default=default_model_name, metavar='MODELNAME',
                     help="model name (default: {:s})".format(default_model_name))
 parser.add_argument('--model.x_dim', type=str, default='1,11,11', metavar='XDIM',
@@ -51,12 +51,12 @@ parser.add_argument('--train.learning_rate', type=float, default=0.0001, metavar
                     help='learning rate (default: 0.0001)')
 parser.add_argument('--train.decay_every', type=int, default=20, metavar='LRDECAY',
                     help='number of epochs after which to decay the learning rate')
-default_weight_decay = 0.1
+default_weight_decay = 0.0
 parser.add_argument('--train.weight_decay', type=float, default=default_weight_decay, metavar='WD',
                     help="weight decay (default: {:f})".format(default_weight_decay))
 parser.add_argument('--train.patience', type=int, default=200, metavar='PATIENCE',
                     help='number of epochs to wait before validation improvement (default: 1000)')
-parser.add_argument('--train.isDistill', action='store_true', default=False,
+parser.add_argument('--train.isDistill', action='store_true', default=True,
                     help='Knowledge Distill(default: False)')
 
 # log args

@@ -56,6 +56,8 @@ def main(opt):
         best_model_name = 'best_teacher_model.pt'
     model = model_utils.load(opt)
 
+    if opt['data.cuda']:
+        model.cuda()
 
     engine = Engine()
 

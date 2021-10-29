@@ -235,7 +235,6 @@ def load_protonet_conv1d(**kwargs):
         conv1d_block_3(64, 32),
         conv1d_block_3(32, 32),
         #Dropout(),
-        conv1d_block_3(32, 32),
         Flatten()
     )
 
