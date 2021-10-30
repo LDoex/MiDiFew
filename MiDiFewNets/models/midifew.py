@@ -16,7 +16,7 @@ class Dropout(nn.Module):
 
 
     def forward(self, input):
-        m = nn.Dropout(0.2)
+        m = nn.Dropout(0.1)
         return m(input)
 
 
@@ -220,7 +220,7 @@ def load_protonet_conv1d(**kwargs):
             nn.Conv1d(in_channels, out_channels, kernel_size=3, padding=1),
             nn.BatchNorm1d(out_channels),
             nn.ReLU(),
-            nn.MaxPool1d(2)
+            nn.MaxPool1d(3, stride=2)
         )
     def conv1d_block_5(in_channels, out_channels):
         return nn.Sequential(
@@ -231,10 +231,10 @@ def load_protonet_conv1d(**kwargs):
         )
 
     encoder = nn.Sequential(
-        conv1d_block_3(x_dim[0], 64),
-        conv1d_block_3(64, 32),
+        conv1d_block_3(x_dim[0], 32),
         conv1d_block_3(32, 32),
-        #Dropout(),
+        Dropout(),
+        conv1d_block_3(32, 32),
         Flatten()
     )
 
