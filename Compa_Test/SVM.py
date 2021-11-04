@@ -2,18 +2,21 @@ from sklearn.svm import SVC # "Support vector classifier"
 import pandas as pd
 from sklearn.utils import shuffle
 from sklearn import metrics
+import torchnet as tnt
+import math
 
 train_shot = 5
 test_shot = 5
 times = 100
 
 train_0 = pd.read_csv("../Data/kdd/TrainClass_0/TrainClass_0.csv")
-train_1 = pd.read_csv("../Data/kdd/TrainClass_1/TrainClass_1.csv")
+train_1 = pd.read_csv("../Data/kdd/TrainClass_4/TrainClass_4.csv")
 test_0 = pd.read_csv("../Data/kdd/TestClass_0/TestClass_0.csv")
-test_1 = pd.read_csv("../Data/kdd/TestClass_1/TestClass_1.csv")
+test_1 = pd.read_csv("../Data/kdd/TestClass_4/TestClass_4.csv")
 
 logFields = ['acc', 'precision', 'recall', 'F1']
-metrics = {}
+meters = {field: tnt.meter.AverageValueMeter() for field in logFields}
+
 
 for i in range(times):
     train_0_sample = train_0.sample(train_shot)
@@ -31,12 +34,26 @@ for i in range(times):
     X_test = test_set.iloc[:, :-1]
     Y_test = test_set.iloc[:, -1]
 
+    for i in range(0, len(Y_train)):
+        if Y_train.iloc[i] != 0.0:
+            Y_train.iloc[i] = 1.0
+        if Y_test.iloc[i] != 0.0:
+            Y_test.iloc[i] = 1.0
+
     model = SVC(kernel="linear")
     model.fit(X_train, Y_train)
     Y_pre = model.predict(X_test)
 
-    precision = metrics.precision_score(Y_test, Y_pre)
-    recall = metrics.recall_score(Y_test, Y_pre)
-    accuracy = metrics.accuracy_score(Y_test, Y_pre)
-    F1 = metrics.f1_score(Y_test, Y_pre)
+    output = {"precision": metrics.precision_score(Y_test, Y_pre),
+             "recall": metrics.recall_score(Y_test, Y_pre),
+             "acc": metrics.accuracy_score(Y_test, Y_pre),
+             "F1": metrics.f1_score(Y_test, Y_pre)}
+
+    for field, meter in meters.items():
+        meter.add(output[field])
+
+for field,meter in meters.items():
+    mean, std = meter.value()
+    print("test {:s}: {:0.6f} +/- {:0.6f}".format(field, mean, 1.96 * std / math.sqrt(times)))
+
 

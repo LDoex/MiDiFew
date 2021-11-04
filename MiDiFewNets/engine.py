@@ -13,6 +13,7 @@ class Engine(object):
         state = {
             'teacher_moder': kwargs['teacher_model'],
             'model': kwargs['model'],
+            'sec_model': kwargs['sec_model'],
             'loader': kwargs['loader'],
             'optim_method': kwargs['optim_method'],
             'optim_config': kwargs['optim_config'],
@@ -24,6 +25,7 @@ class Engine(object):
         }
 
         state['optimizer'] = state['optim_method'](state['model'].parameters(), **state['optim_config'])
+        state['sec_optimizer'] = state['optim_method'](state['sec_model'].parameters(), **state['optim_config'])
 
         self.hooks['on_start'](state)
         while state['epoch'] < state['max_epoch'] and not state['stop']:
@@ -38,8 +40,12 @@ class Engine(object):
                 self.hooks['on_sample'](state)
 
                 state['optimizer'].zero_grad()
+                state['sec_optimizer'].zero_grad()
+
                 loss, state['output'] = state['model'].loss(sample=state['sample'],
-                                                            teacher_model=state['teacher_moder'])
+                                                            teacher_model=state['teacher_moder'],
+                                                            sec_optimizer=state['sec_optimizer'],
+                                                            sec_model=state['sec_model'])
                 self.hooks['on_forward'](state)
 
                 loss.backward()

@@ -15,14 +15,14 @@ with open(os.path.join(filePath, fileName), 'r') as f:
         #去掉F1避免正则匹配到其中的1
         data = re.sub("F1", "", data)
         data = re.sub("}", "", data)
-        data_list = re.findall(r'\d.?\d*', data)
+        data_list = re.findall(r'\d+.?\d*', data)
 
         data_list = list(map(float, data_list))
         df_item = pd.DataFrame(columns=df_columns, data=[data_list])
         df = df.append(df_item, ignore_index=True)
 
 x = df['epoch'].values
-y = df['val_acc'].values
+y = df['val_loss'].values
 
 plt.plot(x, y)
 plt.show()

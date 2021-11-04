@@ -262,16 +262,14 @@ def load_protonet_conv1d(**kwargs):
         )
 
     encoder = nn.Sequential(
-        conv1d_block_3(x_dim[0], 16),
-        conv1d_block_3(16, 16),
-        conv1d_block_3(16, 16),
+        conv1d_block_3(x_dim[0], 32),
         Flatten()
     )
 
     return midifewNet1d_student(encoder)
 
-@register_model('protonet_conv2d')
-def load_protonet_conv2d(**kwargs):
+@register_model('midifew_conv2d')
+def load_midifew_conv2d(**kwargs):
     x_dim = kwargs['x_dim']
     hid_dim = kwargs['hid_dim']
     z_dim = kwargs['z_dim']
