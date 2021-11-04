@@ -32,7 +32,7 @@ parser.add_argument('--data.trainval', action='store_true', default=False, help=
 parser.add_argument('--data.cuda', action='store_true', default=False, help="run in CUDA mode (default: False)")
 
 # model args
-default_model_name = 'midifew_student_conv1d'
+default_model_name = 'midifew_teacher_conv1d'
 parser.add_argument('--model.model_name', type=str, default=default_model_name, metavar='MODELNAME',
                     help="model name (default: {:s})".format(default_model_name))
 parser.add_argument('--model.x_dim', type=str, default='1,11,11', metavar='XDIM',
@@ -41,17 +41,19 @@ parser.add_argument('--model.hid_dim', type=int, default=128, metavar='HIDDIM',
                     help="dimensionality of hidden layers (default: 64)")
 parser.add_argument('--model.z_dim', type=int, default=64, metavar='ZDIM',
                     help="dimensionality of input images (default: 64)")
+parser.add_argument('--model.midiFew', action='store_true', default=True,
+                    help='use midiFew(default: False)')
 
 # train args
 parser.add_argument('--train.epochs', type=int, default=1000, metavar='NEPOCHS',
                     help='number of epochs to train (default: 10000)')
 parser.add_argument('--train.optim_method', type=str, default='Adam', metavar='OPTIM',
                     help='optimization method (default: Adam)')
-parser.add_argument('--train.learning_rate', type=float, default=1, metavar='LR',
+parser.add_argument('--train.learning_rate', type=float, default=0.1, metavar='LR',
                     help='learning rate (default: 0.0001)')
-parser.add_argument('--train.decay_every', type=int, default=15, metavar='LRDECAY',
+parser.add_argument('--train.decay_every', type=int, default=20, metavar='LRDECAY',
                     help='number of epochs after which to decay the learning rate')
-default_weight_decay = 0.0
+default_weight_decay = 0.001
 parser.add_argument('--train.weight_decay', type=float, default=default_weight_decay, metavar='WD',
                     help="weight decay (default: {:f})".format(default_weight_decay))
 parser.add_argument('--train.patience', type=int, default=200, metavar='PATIENCE',

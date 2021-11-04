@@ -4,9 +4,15 @@ from eval import main
 
 parser = argparse.ArgumentParser(description='Evaluate few-shot prototypical networks')
 
-default_model_path = '../../../scripts/train/midifew/results/best_model_withDistill.pt'
+default_model_path = '../../../scripts/train/midifew/results/best_teacher_model.pt'
 parser.add_argument('--model.model_path', type=str, default=default_model_path, metavar='MODELPATH',
                     help="location of pretrained model to evaluate (default: {:s})".format(default_model_path))
+
+default_model_path = '../../../scripts/train/midifew/results/best_teacher_model_sec.pt'
+parser.add_argument('--model.sec_model_path', type=str, default=default_model_path, metavar='MODELPATH',
+                    help="location of pretrained model to evaluate (default: {:s})".format(default_model_path))
+parser.add_argument('--model.midiFew', action='store_true', default=True,
+                    help='use midiFew(default: False)')
 
 parser.add_argument('--data.test_way', type=int, default=2, metavar='TESTWAY',
                     help="number of classes per episode in test. 0 means same as model's data.test_way (default: 0)")

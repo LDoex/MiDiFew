@@ -52,6 +52,7 @@ class Engine(object):
                 self.hooks['on_backward'](state)
 
                 state['optimizer'].step()
+                state['sec_optimizer'].step()
 
                 state['t'] += 1
                 state['batch'] += 1

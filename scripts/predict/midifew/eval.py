@@ -24,7 +24,9 @@ def frames_into_csv(frames):
 def main(opt):
     # load model
     model = torch.load(opt['model.model_path'])
+    sec_model = torch.load(opt['model.sec_model_path'])
     model.eval()
+    sec_model.eval()
 
     # load opts
     model_opt_file = os.path.join(os.path.dirname(opt['model.model_path']), 'opt.json')
@@ -65,10 +67,11 @@ def main(opt):
 
     if data_opt['data.cuda']:
         model.cuda()
+        sec_model.cuda()
 
     meters = { field: tnt.meter.AverageValueMeter() for field in model_opt['log.fields'] }
 
-    model_utils.evaluate(model, data['test'], meters, desc="test")
+    model_utils.evaluate(model, sec_model, data['test'], meters, desc="test")
     # df = pd.DataFrame(data=None, columns=['loss','accuracy','precision','recall','f1-score'])
     # temp = []
 
