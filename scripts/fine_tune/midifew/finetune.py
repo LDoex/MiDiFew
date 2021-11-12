@@ -47,17 +47,11 @@ def main(opt):
         train_loader = data['train']
         val_loader = data['val']
 
-    if 'student' in opt['model.model_name']:
-        if opt['train.isDistill'] == False:
-            best_model_name = 'best_model.pt'
-            best_sec_model = 'best_model_sec.pt'
-        else:
-            best_model_name = 'best_model_withDistill.pt'
-            best_sec_model = 'best_model_Distill_sec.pt'
-    else:
-        best_model_name = 'best_teacher_model.pt'
-        best_sec_model = 'best_teacher_model_sec.pt'
-    model = model_utils.load(opt)
+    best_model_name = 'best_finetune_model.pt'
+    best_sec_model = 'best_finetune_model_sec.pt'
+
+    model = torch.load(opt['model.model_path'])
+    model.train(mode=True)
     sec_opt = {"model.model_name": "midifew_conv2d", "model.x_dim": [5, 11, 11], "model.hid_dim": 5, "model.z_dim": 5}
     sec_model = model_utils.load(sec_opt)
 
@@ -92,15 +86,14 @@ def main(opt):
 
     def on_end_epoch(hook_state, state):
         if val_loader is not None:
-            # if 'best_loss' not in hook_state:
-            #     hook_state['best_loss'] = np.inf
-            if 'best_recall' not in hook_state:
-                hook_state['best_recall'] = np.inf
+            if 'best_loss' not in hook_state:
+                hook_state['best_loss'] = np.inf
             if 'wait' not in hook_state:
                 hook_state['wait'] = 0
 
         if val_loader is not None:
             model_utils.evaluate(state['model'],
+                                 sec_model,
                                  val_loader,
                                  meters['val'],
                                  desc="Epoch {:d} valid".format(state['epoch']))
@@ -115,21 +108,24 @@ def main(opt):
 
 
         if val_loader is not None:
-            if meter_vals['val']['Recall'] < hook_state['best_recall']:
-                hook_state['best_recall'] = meter_vals['val']['Recall']
-                print("==> best model (recall = {:0.6f}), saving model...".format(hook_state['best_recall']))
-            # if meter_vals['val']['loss'] < hook_state['best_loss']:
-            #     hook_state['best_loss'] = meter_vals['val']['loss']
-            #     print("==> best model (loss = {:0.6f}), saving model...".format(hook_state['best_loss']))
+            if meter_vals['val']['loss'] < hook_state['best_loss']:
+                hook_state['best_loss'] = meter_vals['val']['loss']
+                print("==> best model (loss = {:0.6f}), saving model...".format(hook_state['best_loss']))
 
                 state['model'].cpu()
-                state['sec_model'].cpu()
+
+                #save the second model if it exists
+                if state['sec_model']:
+                    state['sec_model'].cpu()
+                    torch.save(state['sec_model'], os.path.join(opt['log.exp_dir'], best_sec_model))
 
                 torch.save(state['model'], os.path.join(opt['log.exp_dir'], best_model_name))
-                torch.save(state['sec_model'], os.path.join(opt['log.exp_dir'], best_sec_model))
+
                 if opt['data.cuda']:
                     state['model'].cuda()
-                    state['sec_model'].cuda()
+
+                    if state['sec_model']:
+                        state['sec_model'].cuda()
 
                 hook_state['wait'] = 0
             else:
@@ -140,16 +136,25 @@ def main(opt):
                     state['stop'] = True
         else:
             state['model'].cpu()
-            state['sec_model'].cpu()
+
+            if state['sec_model']:
+                state['sec_model'].cpu()
+                torch.save(state['model'], os.path.join(opt['log.exp_dir'], best_sec_model))
+
             torch.save(state['model'], os.path.join(opt['log.exp_dir'], best_model_name))
-            torch.save(state['sec_model'], os.path.join(opt['log.exp_dir'], best_sec_model))
+
             if opt['data.cuda']:
                 state['model'].cuda()
-                state['sec_model'].cuda()
+
+                if state['sec_model']:
+                    state['sec_model'].cuda()
 
     engine.hooks['on_end_epoch'] = partial(on_end_epoch, {})
 
     teacher_model = None if 'student' in best_model_name or opt['train.isDistill'] == False else torch.load(os.path.join(opt['log.exp_dir'], 'best_teacher_model.pt'))
+
+    if not opt['model.midiFew']:
+        sec_model = None
 
     engine.train(
         teacher_model=teacher_model,
@@ -159,5 +164,7 @@ def main(opt):
         optim_method=getattr(optim, opt['train.optim_method']),
         optim_config={'lr': opt['train.learning_rate'],
                       'weight_decay': opt['train.weight_decay']},
+        sec_optim_config={'lr': opt['train.sec_learning_rate'],
+                          'weight_decay': opt['train.sec_weight_decay']},
         max_epoch=opt['train.epochs']
     )

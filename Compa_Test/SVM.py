@@ -9,10 +9,10 @@ train_shot = 5
 test_shot = 5
 times = 100
 
-train_0 = pd.read_csv("../Data/kdd/TrainClass_0/TrainClass_0.csv")
-train_1 = pd.read_csv("../Data/kdd/TrainClass_4/TrainClass_4.csv")
-test_0 = pd.read_csv("../Data/kdd/TestClass_0/TestClass_0.csv")
-test_1 = pd.read_csv("../Data/kdd/TestClass_4/TestClass_4.csv")
+train_0 = pd.read_csv("../Data/pipeline/TrainClass_0/TrainClass_0.csv")
+train_1 = pd.read_csv("../Data/pipeline/TrainClass_3/TrainClass_3.csv")
+test_0 = pd.read_csv("../Data/pipeline/TestClass_0/TestClass_0.csv")
+test_1 = pd.read_csv("../Data/pipeline/TestClass_3/TestClass_3.csv")
 
 logFields = ['acc', 'precision', 'recall', 'F1']
 meters = {field: tnt.meter.AverageValueMeter() for field in logFields}

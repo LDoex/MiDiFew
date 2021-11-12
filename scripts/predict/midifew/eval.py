@@ -24,9 +24,12 @@ def frames_into_csv(frames):
 def main(opt):
     # load model
     model = torch.load(opt['model.model_path'])
-    sec_model = torch.load(opt['model.sec_model_path'])
+    sec_model = None
+    if opt['model.midiFew'] == True:
+        sec_model = torch.load(opt['model.sec_model_path'])
+        sec_model.eval()
     model.eval()
-    sec_model.eval()
+
 
     # load opts
     model_opt_file = os.path.join(os.path.dirname(opt['model.model_path']), 'opt.json')

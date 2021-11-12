@@ -120,12 +120,19 @@ def main(opt):
                 print("==> best model (loss = {:0.6f}), saving model...".format(hook_state['best_loss']))
 
                 state['model'].cpu()
-                state['sec_model'].cpu()
+
+                #save the second model if it exists
+                if state['sec_model']:
+                    state['sec_model'].cpu()
+                    torch.save(state['sec_model'], os.path.join(opt['log.exp_dir'], best_sec_model))
+
                 torch.save(state['model'], os.path.join(opt['log.exp_dir'], best_model_name))
-                torch.save(state['sec_model'], os.path.join(opt['log.exp_dir'], best_sec_model))
+
                 if opt['data.cuda']:
                     state['model'].cuda()
-                    state['sec_model'].cuda()
+
+                    if state['sec_model']:
+                        state['sec_model'].cuda()
 
                 hook_state['wait'] = 0
             else:
@@ -136,16 +143,25 @@ def main(opt):
                     state['stop'] = True
         else:
             state['model'].cpu()
-            state['sec_model'].cpu()
+
+            if state['sec_model']:
+                state['sec_model'].cpu()
+                torch.save(state['model'], os.path.join(opt['log.exp_dir'], best_sec_model))
+
             torch.save(state['model'], os.path.join(opt['log.exp_dir'], best_model_name))
-            torch.save(state['model'], os.path.join(opt['log.exp_dir'], best_sec_model))
+
             if opt['data.cuda']:
                 state['model'].cuda()
-                state['sec_model'].cuda()
+
+                if state['sec_model']:
+                    state['sec_model'].cuda()
 
     engine.hooks['on_end_epoch'] = partial(on_end_epoch, {})
 
     teacher_model = None if 'student' in best_model_name or opt['train.isDistill'] == False else torch.load(os.path.join(opt['log.exp_dir'], 'best_teacher_model.pt'))
+
+    if not opt['model.midiFew']:
+        sec_model = None
 
     engine.train(
         teacher_model=teacher_model,
@@ -155,5 +171,7 @@ def main(opt):
         optim_method=getattr(optim, opt['train.optim_method']),
         optim_config={'lr': opt['train.learning_rate'],
                       'weight_decay': opt['train.weight_decay']},
+        sec_optim_config={'lr': opt['train.sec_learning_rate'],
+                          'weight_decay': opt['train.sec_weight_decay']},
         max_epoch=opt['train.epochs']
     )

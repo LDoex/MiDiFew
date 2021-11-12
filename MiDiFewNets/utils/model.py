@@ -13,7 +13,8 @@ def load(opt):
 
 def evaluate(model, sec_model, data_loader, meters, desc=None):
     model.eval()
-    sec_model.eval()
+    if sec_model != None:
+        sec_model.eval()
 
     for field,meter in meters.items():
         meter.reset()

@@ -26,7 +26,7 @@ class myDataset(Dataset):
 
 
 Pipeline_CACHE = {}
-DATA_DIR = os.path.join(os.path.dirname(__file__), '../../Data/kdd')
+DATA_DIR = os.path.join(os.path.dirname(__file__), '../../Data/')
 
 
 def extract_episode(n_support, n_query, d):
@@ -58,9 +58,9 @@ def scale_data(key, d):
     d[key] = d[key].reshape(1, (d[key].shape[0]))
     return d
 
-def load_class_data(d):
+def load_class_data(dataset, d):
     alphabet = d['class']
-    data_dir = os.path.join(DATA_DIR, alphabet,alphabet+'.csv')
+    data_dir = os.path.join(DATA_DIR, dataset, alphabet, alphabet+'.csv')
 
     #读入数据
     class_data = myDataset(data_dir)
@@ -83,7 +83,7 @@ def load_class_data(d):
 
 
 def load(opt, splits):
-    split_dir = os.path.join(DATA_DIR, 'splits', opt['data.split'])
+    split_dir = os.path.join(DATA_DIR, opt['data.dataset'], 'splits', opt['data.split'])
 
     ret = {}
 
@@ -110,7 +110,7 @@ def load(opt, splits):
 
 
         transforms = [partial(convert_dict, 'class'),
-                      load_class_data,
+                      partial(load_class_data, opt['data.dataset']),
                       partial(extract_episode, n_support, n_query)]
 
         if opt['data.cuda']:

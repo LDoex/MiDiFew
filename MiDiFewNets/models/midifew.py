@@ -17,7 +17,7 @@ class Dropout(nn.Module):
 
 
     def forward(self, input):
-        m = nn.Dropout(0.1)
+        m = nn.Dropout(0.2)
         return m(input)
 
 # train the Net
@@ -133,33 +133,44 @@ class midifewNet1d_teacher(nn.Module):
 
         z_dim = z.size(-1)
 
-        loss_sec, meters = sec_model.loss(sample, z)
+        if sec_model != None:
+            loss_val, meters = sec_model.loss(sample, z)
 
-        z_proto = z[:n_class * n_support].view(n_class, n_support, z_dim).mean(1)
-        zq = z[n_class * n_support:]
+        else:
+            z_proto = z[:n_class * n_support].view(n_class, n_support, z_dim).mean(1)
+            zq = z[n_class * n_support:]
 
-        dists = euclidean_dist(zq, z_proto)
+            dists = euclidean_dist(zq, z_proto)
 
-        log_p_y = F.log_softmax(-dists, dim=1)
+            log_p_y = F.log_softmax(-dists, dim=1)
 
-        log_p_y = log_p_y.view(n_class, n_query, -1)
+            log_p_y = log_p_y.view(n_class, n_query, -1)
 
-        loss_log = -log_p_y.gather(2, target_inds).squeeze().view(-1).mean()
+            loss_log = -log_p_y.gather(2, target_inds).squeeze().view(-1).mean()
 
-        loss_val = loss_log
+            loss_val = loss_log
 
-        _, y_hat = log_p_y.max(2)
-        acc_val = torch.eq(y_hat, target_inds.squeeze()).float().mean()
+            _, y_hat = log_p_y.max(2)
+            acc_val = torch.eq(y_hat, target_inds.squeeze()).float().mean()
 
-        y_re = target_inds.squeeze()
+            y_re = target_inds.squeeze()
 
-        y_real = np.array(y_re.cpu()).reshape(-1)
-        y_pred = np.array(y_hat.cpu()).reshape(-1)
-        acc = accuracy_score(y_real, y_pred)  # TP+TN/(TP+FN+FP+TN)
-        pre = precision_score(y_real, y_pred, average='binary')  # TP/TP+FP
-        rec = recall_score(y_real, y_pred, average='binary')  # TP/TP+FN
-        F1s = f1_score(y_real, y_pred, average='binary')  # 2*(pre*recall/(pre+recall))
-        # F1s, pre, rec, TP = f_score(y_real, y_pred)
+            y_real = np.array(y_re.cpu()).reshape(-1)
+            y_pred = np.array(y_hat.cpu()).reshape(-1)
+            acc = accuracy_score(y_real, y_pred)  # TP+TN/(TP+FN+FP+TN)
+            pre = precision_score(y_real, y_pred, average='binary')  # TP/TP+FP
+            rec = recall_score(y_real, y_pred, average='binary')  # TP/TP+FN
+            F1s = f1_score(y_real, y_pred, average='binary')  # 2*(pre*recall/(pre+recall))
+            # F1s, pre, rec, TP = f_score(y_real, y_pred)
+
+            meters = {
+            'loss': loss_val.item(),
+            'acc': acc_val.item(),
+            'Accuracy': acc,
+            'Precision': pre,
+            'Recall': rec,
+            'F1': F1s
+            }
 
         # return loss_val, {
         #     'loss': loss_val.item(),
@@ -169,7 +180,7 @@ class midifewNet1d_teacher(nn.Module):
         #     'Recall': rec,
         #     'F1': F1s
         # }
-        return loss_sec, meters
+        return loss_val, meters
 
 class midifewNet1d_student(nn.Module):
     def __init__(self, encoder):
@@ -222,8 +233,8 @@ class midifewNet1d_student(nn.Module):
         # distill setting
         # if teacher_model is exist, setting args
         if teacher_model is not None:
-            w_teacher = 0.5
-            w_student = 0.5
+            w_teacher = 0
+            w_student = 1
             teacher_model.eval()
             T = 6
             if xq.is_cuda:
@@ -238,7 +249,7 @@ class midifewNet1d_student(nn.Module):
 
             teacher_dists = euclidean_dist(teacher_zq, teacher_z_proto)
 
-            soft_label = F.log_softmax(teacher_dists/T, dim=1)
+            soft_label = F.softmax(teacher_dists/T, dim=1)
             student_label = F.log_softmax(dists/T, dim=1)
 
             loss_ditill = nn.KLDivLoss(reduction="batchmean")(student_label, soft_label) * T * T
@@ -292,10 +303,10 @@ def load_protonet_conv1d(**kwargs):
         )
 
     encoder = nn.Sequential(
-        conv1d_block_3(x_dim[0], 32),
-        conv1d_block_3(32, 32),
-        Dropout(),
-        conv1d_block_3(32, 32),
+        conv1d_block_3(x_dim[0], 16),
+        conv1d_block_3(16, 32),
+        conv1d_block_3(32, 16),
+        #Dropout(),
         Flatten()
     )
 
@@ -314,6 +325,8 @@ def load_protonet_conv1d(**kwargs):
             nn.ReLU(),
             nn.MaxPool1d(2)
         )
+    def linear(in_channels, out_channels):
+        return nn.Linear(in_channels,out_channels)
     def conv1d_block_5(in_channels, out_channels):
         return nn.Sequential(
             nn.Conv1d(in_channels, out_channels, kernel_size=3, padding=2),
@@ -323,7 +336,13 @@ def load_protonet_conv1d(**kwargs):
         )
 
     encoder = nn.Sequential(
-        conv1d_block_3(x_dim[0], 32),
+        #conv1d_block_3(x_dim[0], 1),
+
+        conv1d_block_3(x_dim[0], 16),
+        conv1d_block_3(16, 32),
+        conv1d_block_3(32, 16),
+        #conv1d_block_3(8, 8),
+        #linear(26, 32),
         Flatten()
     )
 
@@ -347,10 +366,10 @@ def load_midifew_conv2d(**kwargs):
         return nn.Linear(in_channels, out_channels)
 
     encoder = nn.Sequential(
-        conv2d_block(x_dim[0], 32),
-        conv2d_block(32, 16),
+        conv2d_block(x_dim[0], 16),
+        #conv2d_block(16, 16),
         Flatten(),
-        linear_block(144, 128)
+        linear_block(576, 160)
     )
 
     return midifewNet2d(encoder)

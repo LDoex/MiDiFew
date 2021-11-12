@@ -1,6 +1,6 @@
 import argparse
 
-from train import main
+from finetune import main
 
 parser = argparse.ArgumentParser(description='Train prototypical networks')
 
@@ -42,6 +42,11 @@ parser.add_argument('--model.hid_dim', type=int, default=128, metavar='HIDDIM',
 parser.add_argument('--model.z_dim', type=int, default=64, metavar='ZDIM',
                     help="dimensionality of input images (default: 64)")
 
+#input model
+default_model_path = '../../../scripts/train/midifew/results/best_model.pt'
+parser.add_argument('--model.model_path', type=str, default=default_model_path, metavar='MODELPATH',
+                    help="location of pretrained model to evaluate (default: {:s})".format(default_model_path))
+
 #midifew
 parser.add_argument('--model.midiFew', action='store_true', default=False,
                     help='use midiFew(default: False)')
@@ -51,13 +56,13 @@ parser.add_argument('--train.epochs', type=int, default=1000, metavar='NEPOCHS',
                     help='number of epochs to train (default: 10000)')
 parser.add_argument('--train.optim_method', type=str, default='Adam', metavar='OPTIM',
                     help='optimization method (default: Adam)')
-parser.add_argument('--train.learning_rate', type=float, default=0.008, metavar='LR',
+parser.add_argument('--train.learning_rate', type=float, default=0.0001, metavar='LR',
                     help='learning rate (default: 0.0001)')
 parser.add_argument('--train.sec_learning_rate', type=float, default=0.008, metavar='SEC_LR',
                     help='learning rate (default: 0.0001)')
 parser.add_argument('--train.decay_every', type=int, default=20, metavar='LRDECAY',
                     help='number of epochs after which to decay the learning rate')
-default_weight_decay = 0.01
+default_weight_decay = 0.0
 parser.add_argument('--train.weight_decay', type=float, default=default_weight_decay, metavar='WD',
                     help="weight decay (default: {:f})".format(default_weight_decay))
 parser.add_argument('--train.sec_weight_decay', type=float, default=0.00, metavar='SEC_WD',
@@ -65,7 +70,7 @@ parser.add_argument('--train.sec_weight_decay', type=float, default=0.00, metava
 parser.add_argument('--train.patience', type=int, default=200, metavar='PATIENCE',
                     help='number of epochs to wait before validation improvement (default: 1000)')
 #Distillation
-parser.add_argument('--train.isDistill', action='store_true', default=True,
+parser.add_argument('--train.isDistill', action='store_true', default=False,
                     help='Knowledge Distillation(default: False)')
 
 # log args

@@ -22,7 +22,7 @@ with open(os.path.join(filePath, fileName), 'r') as f:
         df = df.append(df_item, ignore_index=True)
 
 x = df['epoch'].values
-y = df['val_loss'].values
+y = df['train_loss'].values
 
 plt.plot(x, y)
 plt.show()
