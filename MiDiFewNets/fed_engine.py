@@ -16,11 +16,16 @@ class Engine(object):
             'loader': kwargs['loader'],
             'optim_method': kwargs['optim_method'],
             'optim_config': kwargs['optim_config'],
+
             'max_epoch': kwargs['max_epoch'],
             'epoch': 0, # epochs done so far
             't': 0, # samples seen so far
             'batch': 0, # samples seen in current epoch
-            'stop': False
+            'stop': False,
+            'cur_comm_num': kwargs['cur_comm_num'],
+            'client_name': kwargs['client_name'],
+            'clients_best_loss': kwargs['clients_best_loss'],
+            'clients_best_model': kwargs['clients_best_model']
         }
 
         state['optimizer'] = state['optim_method'](state['model'].parameters(), **state['optim_config'])
@@ -40,13 +45,18 @@ class Engine(object):
                 state['optimizer'].zero_grad()
 
                 loss, state['output'] = state['model'].loss(sample=state['sample'],
-                                                            teacher_model=state['teacher_moder'])
+                                                            teacher_model=state['teacher_moder'],
+                                                            sec_optimizer=state['sec_optimizer'],
+                                                            sec_model=state['sec_model'])
                 self.hooks['on_forward'](state)
 
                 loss.backward()
                 self.hooks['on_backward'](state)
 
                 state['optimizer'].step()
+
+                if state['sec_optimizer']:
+                    state['sec_optimizer'].step()
 
                 state['t'] += 1
                 state['batch'] += 1
@@ -58,4 +68,4 @@ class Engine(object):
 
         self.hooks['on_end'](state)
 
-        return state['model'].state_dict()
+        return state['clients_best_model'][state['client_name']]

@@ -48,16 +48,12 @@ def main(opt):
         val_loader = data['val']
 
     best_model_name = 'best_finetune_model.pt'
-    best_sec_model = 'best_finetune_model_sec.pt'
 
     model = torch.load(opt['model.model_path'])
     model.train(mode=True)
-    sec_opt = {"model.model_name": "midifew_conv2d", "model.x_dim": [5, 11, 11], "model.hid_dim": 5, "model.z_dim": 5}
-    sec_model = model_utils.load(sec_opt)
 
     if opt['data.cuda']:
         model.cuda()
-        sec_model.cuda()
 
     engine = Engine()
 
@@ -93,7 +89,6 @@ def main(opt):
 
         if val_loader is not None:
             model_utils.evaluate(state['model'],
-                                 sec_model,
                                  val_loader,
                                  meters['val'],
                                  desc="Epoch {:d} valid".format(state['epoch']))
@@ -114,18 +109,12 @@ def main(opt):
 
                 state['model'].cpu()
 
-                #save the second model if it exists
-                if state['sec_model']:
-                    state['sec_model'].cpu()
-                    torch.save(state['sec_model'], os.path.join(opt['log.exp_dir'], best_sec_model))
 
                 torch.save(state['model'], os.path.join(opt['log.exp_dir'], best_model_name))
 
                 if opt['data.cuda']:
                     state['model'].cuda()
 
-                    if state['sec_model']:
-                        state['sec_model'].cuda()
 
                 hook_state['wait'] = 0
             else:

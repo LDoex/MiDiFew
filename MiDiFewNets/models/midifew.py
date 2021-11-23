@@ -17,7 +17,7 @@ class Dropout(nn.Module):
 
 
     def forward(self, input):
-        m = nn.Dropout(0.2)
+        m = nn.Dropout(0.15)
         return m(input)
 
 # train the Net
@@ -27,6 +27,93 @@ class Flatten(nn.Module):
 
     def forward(self, x):
         return x.view(x.size(0),-1)
+
+class Resize(nn.Module):
+    def __init__(self):
+        super(Resize, self).__init__()
+
+    def forward(self, x, n_class, n_support, data_dim, need_dim):
+        if need_dim*need_dim>data_dim:
+            zero = torch.zeros(x.size(0), need_dim*need_dim-data_dim)
+            x = torch.cat([x, zero], dim=1).view(n_class, n_support, need_dim, need_dim)
+        return x
+
+class midifewFinalNet(nn.Module):
+    def __init__(self, encoders):
+        super(midifewFinalNet, self).__init__()
+        self.encoders = encoders
+        self.linear = nn.Linear(26, 16)
+        self.flatten = Flatten()
+        self.resize_block = Resize()
+
+    def forward(self, x, n_class, n_support, n_query):
+        x = self.encoders[0].forward(x)
+        xs = self.resize_block.forward(x[:n_class * n_support], n_class, n_support, x.size(-1),
+                                       math.ceil(x.size(-1)**0.5))
+        xq = x[n_class * n_support:]
+        xs = self.encoders[1].forward(xs)
+        return torch.cat([xs, xq], 0)
+
+    def loss(self, **kwargs):
+        sample = kwargs['sample']
+        teacher_model = kwargs['teacher_model']
+        xs = Variable(sample['xs'])  # support
+        xq = Variable(sample['xq'])  # query
+
+        n_class = xs.size(0)
+        assert xq.size(0) == n_class
+        n_support = xs.size(1)
+        n_query = xq.size(1)
+
+        target_inds = torch.arange(0, n_class).view(n_class, 1, 1).expand(n_class, n_query, 1).long()
+        target_inds = Variable(target_inds, requires_grad=False)
+
+        if xq.is_cuda:
+            target_inds = target_inds.cuda()
+
+        x = torch.cat([xs.view(n_class * n_support, *xs.size()[2:]),
+                       xq.view(n_class * n_query, *xq.size()[2:])], 0)
+
+        z = self.forward(x, n_class, n_support, n_query)
+
+        z_dim = z.size(-1)
+
+        z_proto = z[:n_class]
+        zq = z[n_class:]
+
+        dists = euclidean_dist(zq, z_proto)
+
+        log_p_y = F.log_softmax(-dists, dim=1)
+
+        log_p_y = log_p_y.view(n_class, n_query, -1)
+
+        loss_log = -log_p_y.gather(2, target_inds).squeeze().view(-1).mean()
+
+        loss_val = loss_log
+
+        _, y_hat = log_p_y.max(2)
+        acc_val = torch.eq(y_hat, target_inds.squeeze()).float().mean()
+
+        y_re = target_inds.squeeze()
+
+        y_real = np.array(y_re.cpu()).reshape(-1)
+        y_pred = np.array(y_hat.cpu()).reshape(-1)
+        acc = accuracy_score(y_real, y_pred)  # TP+TN/(TP+FN+FP+TN)
+        pre = precision_score(y_real, y_pred, average='binary')  # TP/TP+FP
+        rec = recall_score(y_real, y_pred, average='binary')  # TP/TP+FN
+        F1s = f1_score(y_real, y_pred, average='binary')  # 2*(pre*recall/(pre+recall))
+        # F1s, pre, rec, TP = f_score(y_real, y_pred)
+
+        meters = {
+            'loss': loss_val.item(),
+            'acc': acc_val.item(),
+            'Accuracy': acc,
+            'Precision': pre,
+            'Recall': rec,
+            'F1': F1s
+        }
+
+        return loss_val, meters
 
 class midifewNet2d(nn.Module):
     def __init__(self, encoder):
@@ -101,7 +188,6 @@ class midifewNet1d_teacher(nn.Module):
 
     def loss(self, **kwargs):
         sample = kwargs['sample']
-        sec_model = kwargs['sec_model']
         xs = Variable(sample['xs'])  # support
         xq = Variable(sample['xq'])  # query
 
@@ -133,44 +219,40 @@ class midifewNet1d_teacher(nn.Module):
 
         z_dim = z.size(-1)
 
-        if sec_model != None:
-            loss_val, meters = sec_model.loss(sample, z)
+        z_proto = z[:n_class * n_support].view(n_class, n_support, z_dim).mean(1)
+        zq = z[n_class * n_support:]
 
-        else:
-            z_proto = z[:n_class * n_support].view(n_class, n_support, z_dim).mean(1)
-            zq = z[n_class * n_support:]
+        dists = euclidean_dist(zq, z_proto)
 
-            dists = euclidean_dist(zq, z_proto)
+        log_p_y = F.log_softmax(-dists, dim=1)
 
-            log_p_y = F.log_softmax(-dists, dim=1)
+        log_p_y = log_p_y.view(n_class, n_query, -1)
 
-            log_p_y = log_p_y.view(n_class, n_query, -1)
+        loss_log = -log_p_y.gather(2, target_inds).squeeze().view(-1).mean()
 
-            loss_log = -log_p_y.gather(2, target_inds).squeeze().view(-1).mean()
+        loss_val = loss_log
 
-            loss_val = loss_log
+        _, y_hat = log_p_y.max(2)
+        acc_val = torch.eq(y_hat, target_inds.squeeze()).float().mean()
 
-            _, y_hat = log_p_y.max(2)
-            acc_val = torch.eq(y_hat, target_inds.squeeze()).float().mean()
+        y_re = target_inds.squeeze()
 
-            y_re = target_inds.squeeze()
+        y_real = np.array(y_re.cpu()).reshape(-1)
+        y_pred = np.array(y_hat.cpu()).reshape(-1)
+        acc = accuracy_score(y_real, y_pred)  # TP+TN/(TP+FN+FP+TN)
+        pre = precision_score(y_real, y_pred, average='binary')  # TP/TP+FP
+        rec = recall_score(y_real, y_pred, average='binary')  # TP/TP+FN
+        F1s = f1_score(y_real, y_pred, average='binary')  # 2*(pre*recall/(pre+recall))
+        # F1s, pre, rec, TP = f_score(y_real, y_pred)
 
-            y_real = np.array(y_re.cpu()).reshape(-1)
-            y_pred = np.array(y_hat.cpu()).reshape(-1)
-            acc = accuracy_score(y_real, y_pred)  # TP+TN/(TP+FN+FP+TN)
-            pre = precision_score(y_real, y_pred, average='binary')  # TP/TP+FP
-            rec = recall_score(y_real, y_pred, average='binary')  # TP/TP+FN
-            F1s = f1_score(y_real, y_pred, average='binary')  # 2*(pre*recall/(pre+recall))
-            # F1s, pre, rec, TP = f_score(y_real, y_pred)
-
-            meters = {
-            'loss': loss_val.item(),
-            'acc': acc_val.item(),
-            'Accuracy': acc,
-            'Precision': pre,
-            'Recall': rec,
-            'F1': F1s
-            }
+        meters = {
+        'loss': loss_val.item(),
+        'acc': acc_val.item(),
+        'Accuracy': acc,
+        'Precision': pre,
+        'Recall': rec,
+        'F1': F1s
+        }
 
         # return loss_val, {
         #     'loss': loss_val.item(),
@@ -233,10 +315,10 @@ class midifewNet1d_student(nn.Module):
         # distill setting
         # if teacher_model is exist, setting args
         if teacher_model is not None:
-            w_teacher = 0
-            w_student = 1
+            w_teacher = 0.5
+            w_student = 0.5
             teacher_model.eval()
-            T = 6
+            T = 5
             if xq.is_cuda:
                 teacher_model.cuda()
 
@@ -304,8 +386,8 @@ def load_protonet_conv1d(**kwargs):
 
     encoder = nn.Sequential(
         conv1d_block_3(x_dim[0], 16),
-        conv1d_block_3(16, 32),
-        conv1d_block_3(32, 16),
+        conv1d_block_3(16, 16),
+        #conv1d_block_3(32, 16),
         #Dropout(),
         Flatten()
     )
@@ -336,11 +418,13 @@ def load_protonet_conv1d(**kwargs):
         )
 
     encoder = nn.Sequential(
-        #conv1d_block_3(x_dim[0], 1),
+        conv1d_block_3(x_dim[0], 1),
 
-        conv1d_block_3(x_dim[0], 16),
-        conv1d_block_3(16, 32),
-        conv1d_block_3(32, 16),
+        # conv1d_block_3(x_dim[0], 16),
+        # conv1d_block_3(16, 32),
+        # conv1d_block_3(32, 16),
+
+
         #conv1d_block_3(8, 8),
         #linear(26, 32),
         Flatten()
@@ -348,11 +432,19 @@ def load_protonet_conv1d(**kwargs):
 
     return midifewNet1d_student(encoder)
 
-@register_model('midifew_conv2d')
+@register_model('midifew_final')
 def load_midifew_conv2d(**kwargs):
     x_dim = kwargs['x_dim']
     hid_dim = kwargs['hid_dim']
     z_dim = kwargs['z_dim']
+
+    def conv1d_block_3(in_channels, out_channels):
+        return nn.Sequential(
+            nn.Conv1d(in_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU(),
+            nn.MaxPool1d(2)
+        )
 
     def conv2d_block(in_channels, out_channels):
         return nn.Sequential(
@@ -365,11 +457,22 @@ def load_midifew_conv2d(**kwargs):
     def linear_block(in_channels, out_channels):
         return nn.Linear(in_channels, out_channels)
 
-    encoder = nn.Sequential(
-        conv2d_block(x_dim[0], 16),
-        #conv2d_block(16, 16),
-        Flatten(),
-        linear_block(576, 160)
+    encoder1 = nn.Sequential(
+        conv1d_block_3(x_dim[0], 16),
+        conv1d_block_3(16, 16),
+        # conv1d_block_3(32, 16),
+        # Dropout(),
+        Flatten()
     )
 
-    return midifewNet2d(encoder)
+    encoder2 = nn.Sequential(
+        conv2d_block(5, 16),
+        # conv2d_block(16, 16),
+        Flatten(),
+        linear_block(400, 96)
+    )
+
+
+    encoders = nn.ModuleList([encoder1, encoder2])
+
+    return midifewFinalNet(encoders)

@@ -50,21 +50,18 @@ def main(opt):
     if 'student' in opt['model.model_name']:
         if opt['train.isDistill'] == False:
             best_model_name = 'best_model.pt'
-            best_sec_model = 'best_model_sec.pt'
         else:
             best_model_name = 'best_model_withDistill.pt'
-            best_sec_model = 'best_model_Distill_sec.pt'
-    else:
+    elif 'teacher' in opt['model.model_name']:
         best_model_name = 'best_teacher_model.pt'
-        best_sec_model = 'best_teacher_model_sec.pt'
+    else:
+        best_model_name = opt['log.best_name']
 
     model = model_utils.load(opt)
-    sec_opt = {"model.model_name": "midifew_conv2d", "model.x_dim": [5, 11, 11], "model.hid_dim": 5, "model.z_dim": 5}
-    sec_model = model_utils.load(sec_opt)
 
     if opt['data.cuda']:
         model.cuda()
-        sec_model.cuda()
+
 
     engine = Engine()
 
@@ -100,7 +97,6 @@ def main(opt):
 
         if val_loader is not None:
             model_utils.evaluate(state['model'],
-                                 sec_model,
                                  val_loader,
                                  meters['val'],
                                  desc="Epoch {:d} valid".format(state['epoch']))
@@ -120,11 +116,6 @@ def main(opt):
                 print("==> best model (loss = {:0.6f}), saving model...".format(hook_state['best_loss']))
 
                 state['model'].cpu()
-
-                #save the second model if it exists
-                if state['sec_model']:
-                    state['sec_model'].cpu()
-                    torch.save(state['sec_model'], os.path.join(opt['log.exp_dir'], best_sec_model))
 
                 torch.save(state['model'], os.path.join(opt['log.exp_dir'], best_model_name))
 
@@ -160,13 +151,10 @@ def main(opt):
 
     teacher_model = None if 'student' in best_model_name or opt['train.isDistill'] == False else torch.load(os.path.join(opt['log.exp_dir'], 'best_teacher_model.pt'))
 
-    if not opt['model.midiFew']:
-        sec_model = None
 
     engine.train(
         teacher_model=teacher_model,
         model=model,
-        sec_model=sec_model,
         loader=train_loader,
         optim_method=getattr(optim, opt['train.optim_method']),
         optim_config={'lr': opt['train.learning_rate'],

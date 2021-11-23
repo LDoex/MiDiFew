@@ -74,7 +74,7 @@ def load_class_data(dataset, d):
                                         partial(scale_data, 'data'),
                                         partial(convert_tensor, 'data')]))
 
-    loader = torch.utils.data.DataLoader(data_ds, batch_size=10, shuffle=False)
+    loader = torch.utils.data.DataLoader(data_ds, batch_size=20, shuffle=False)
     for sample in loader:
         Pipeline_CACHE[d['class']] = sample['data']
         break  # only need one sample because batch size equal to dataset length

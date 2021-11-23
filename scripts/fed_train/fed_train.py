@@ -11,28 +11,24 @@ import torch.optim.lr_scheduler as lr_scheduler
 import torchvision
 import torchnet as tnt
 
-from MiDiFewNets.engine import Engine
+from MiDiFewNets.fed_engine import Engine
 
 import MiDiFewNets.utils.data as data_utils
 import MiDiFewNets.utils.model as model_utils
 import MiDiFewNets.utils.log as log_utils
 
 
-def main(opt):
+def fed_train_main(opt, net, global_parameters, client_name, comm_num, clients_best_model, clients_best_loss):
     if not os.path.isdir(opt['log.exp_dir']):
         os.makedirs(opt['log.exp_dir'])
 
 
-    # save opts
-    with open(os.path.join(opt['log.exp_dir'], 'opt.json'), 'w') as f:
-        json.dump(opt, f)
-        f.write('\n')
+    # # save opts
+    # with open(os.path.join(opt['log.exp_dir'], client_name+'_opt.json'), 'w') as f:
+    #     json.dump(opt, f)
+    #     f.write('\n')
 
-    trace_file = os.path.join(opt['log.exp_dir'], 'trace.txt')
-
-    # Postprocess arguments
-    opt['model.x_dim'] = list(map(int, opt['model.x_dim'].split(',')))
-    opt['log.fields'] = opt['log.fields'].split(',')
+    trace_file = os.path.join(opt['log.exp_dir'], client_name+'_trace.txt')
 
     torch.manual_seed(1234)
     if opt['data.cuda']:
@@ -50,20 +46,20 @@ def main(opt):
     if 'student' in opt['model.model_name']:
         if opt['train.isDistill'] == False:
             best_model_name = 'best_model.pt'
-            best_sec_model = 'best_model_sec.pt'
+
         else:
             best_model_name = 'best_model_withDistill.pt'
-            best_sec_model = 'best_model_Distill_sec.pt'
+
     else:
         best_model_name = 'best_teacher_model.pt'
-        best_sec_model = 'best_teacher_model_sec.pt'
-    model = model_utils.load(opt)
-    sec_opt = {"model.model_name": "midifew_conv2d", "model.x_dim": [5, 11, 11], "model.hid_dim": 5, "model.z_dim": 5}
-    sec_model = model_utils.load(sec_opt)
+
+
+    best_model_name = 'best_local_model.pt'
+    model = net
+    model.load_state_dict(global_parameters, strict=True)
 
     if opt['data.cuda']:
         model.cuda()
-        sec_model.cuda()
 
     engine = Engine()
 
@@ -73,7 +69,7 @@ def main(opt):
         meters['val'] = {field: tnt.meter.AverageValueMeter() for field in opt['log.fields']}
 
     def on_start(state):
-        if os.path.isfile(trace_file):
+        if os.path.isfile(trace_file) and state['cur_comm_num']==0:
             os.remove(trace_file)
         state['scheduler'] = lr_scheduler.StepLR(state['optimizer'], opt['train.decay_every'], gamma=0.5)
     engine.hooks['on_start'] = on_start
@@ -94,8 +90,8 @@ def main(opt):
         if val_loader is not None:
             # if 'best_loss' not in hook_state:
             #     hook_state['best_loss'] = np.inf
-            if 'best_recall' not in hook_state:
-                hook_state['best_recall'] = np.inf
+            if 'best_loss' not in hook_state:
+                hook_state['best_loss'] = np.inf
             if 'wait' not in hook_state:
                 hook_state['wait'] = 0
 
@@ -115,21 +111,27 @@ def main(opt):
 
 
         if val_loader is not None:
-            if meter_vals['val']['Recall'] < hook_state['best_recall']:
-                hook_state['best_recall'] = meter_vals['val']['Recall']
-                print("==> best model (recall = {:0.6f}), saving model...".format(hook_state['best_recall']))
+            if meter_vals['val']['loss'] < state['clients_best_loss'][state['client_name']]:
+                state['clients_best_loss'][state['client_name']] = meter_vals['val']['loss']
+                print("==> best model (loss = {:0.6f}), saving model...".format(state['clients_best_loss'][state['client_name']]))
             # if meter_vals['val']['loss'] < hook_state['best_loss']:
             #     hook_state['best_loss'] = meter_vals['val']['loss']
             #     print("==> best model (loss = {:0.6f}), saving model...".format(hook_state['best_loss']))
 
+                state['clients_best_model'][state['client_name']] = state['model'].state_dict()
                 state['model'].cpu()
-                state['sec_model'].cpu()
 
-                torch.save(state['model'], os.path.join(opt['log.exp_dir'], best_model_name))
-                torch.save(state['sec_model'], os.path.join(opt['log.exp_dir'], best_sec_model))
+                # save the second model if it exists
+                if state['sec_model']:
+                    state['sec_model'].cpu()
+                    torch.save(state['sec_model'], os.path.join(opt['log.exp_dir'], best_sec_model))
+
+                torch.save(state['model'], os.path.join(opt['log.exp_dir'], client_name+'_'+best_model_name))
+
                 if opt['data.cuda']:
                     state['model'].cuda()
-                    state['sec_model'].cuda()
+                    if state['sec_model']:
+                        state['sec_model'].cuda()
 
                 hook_state['wait'] = 0
             else:
@@ -140,18 +142,27 @@ def main(opt):
                     state['stop'] = True
         else:
             state['model'].cpu()
-            state['sec_model'].cpu()
-            torch.save(state['model'], os.path.join(opt['log.exp_dir'], best_model_name))
-            torch.save(state['sec_model'], os.path.join(opt['log.exp_dir'], best_sec_model))
+
+            # save the second model if it exists
+            if state['sec_model']:
+                state['sec_model'].cpu()
+                torch.save(state['sec_model'], os.path.join(opt['log.exp_dir'], best_sec_model))
+
+            torch.save(state['model'], os.path.join(opt['log.exp_dir'], client_name+best_model_name))
+
             if opt['data.cuda']:
                 state['model'].cuda()
-                state['sec_model'].cuda()
+                if state['sec_model']:
+                    state['sec_model'].cuda()
 
     engine.hooks['on_end_epoch'] = partial(on_end_epoch, {})
 
+    if not opt['model.midiFew']:
+        sec_model = None
+
     teacher_model = None if 'student' in best_model_name or opt['train.isDistill'] == False else torch.load(os.path.join(opt['log.exp_dir'], 'best_teacher_model.pt'))
 
-    engine.train(
+    return engine.train(
         teacher_model=teacher_model,
         model=model,
         sec_model=sec_model,
@@ -159,5 +170,11 @@ def main(opt):
         optim_method=getattr(optim, opt['train.optim_method']),
         optim_config={'lr': opt['train.learning_rate'],
                       'weight_decay': opt['train.weight_decay']},
-        max_epoch=opt['train.epochs']
+        sec_optim_config={'lr': opt['train.sec_learning_rate'],
+                          'weight_decay': opt['train.sec_weight_decay']},
+        max_epoch=opt['train.epochs'],
+        cur_comm_num=comm_num,
+        client_name=client_name,
+        clients_best_loss=clients_best_loss,
+        clients_best_model=clients_best_model
     )

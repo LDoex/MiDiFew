@@ -23,16 +23,17 @@ parser.add_argument('--data.test_shot', type=int, default=5, metavar='TESTSHOT',
                     help="number of support examples per class in test. 0 means same as data.shot (default: 0)")
 parser.add_argument('--data.test_query', type=int, default=5, metavar='TESTQUERY',
                     help="number of query examples per class in test. 0 means same as data.query (default: 15)")
-parser.add_argument('--data.train_episodes', type=int, default=20, metavar='NTRAIN',
+parser.add_argument('--data.train_episodes', type=int, default=5, metavar='NTRAIN',
                     help="number of train episodes per epoch (default: 100)")
-parser.add_argument('--data.test_episodes', type=int, default=20, metavar='NTEST',
+parser.add_argument('--data.test_episodes', type=int, default=5, metavar='NTEST',
                     help="number of test episodes per epoch (default: 100)")
 parser.add_argument('--data.trainval', action='store_true', default=False, help="run in train+validation mode (default: False)")
 #parser.add_argument('--data.sequential', action='store_true', default=False, help="use sequential sampler instead of episodic (default: False)")
 parser.add_argument('--data.cuda', action='store_true', default=False, help="run in CUDA mode (default: False)")
 
 # model args
-default_model_name = 'midifew_student_conv1d'
+#default_model_name = 'midifew_teacher_conv1d'
+default_model_name = 'midifew_final'
 parser.add_argument('--model.model_name', type=str, default=default_model_name, metavar='MODELNAME',
                     help="model name (default: {:s})".format(default_model_name))
 parser.add_argument('--model.x_dim', type=str, default='1,11,11', metavar='XDIM',
@@ -41,10 +42,6 @@ parser.add_argument('--model.hid_dim', type=int, default=128, metavar='HIDDIM',
                     help="dimensionality of hidden layers (default: 64)")
 parser.add_argument('--model.z_dim', type=int, default=64, metavar='ZDIM',
                     help="dimensionality of input images (default: 64)")
-
-#midifew
-parser.add_argument('--model.midiFew', action='store_true', default=False,
-                    help='use midiFew(default: False)')
 
 # train args
 parser.add_argument('--train.epochs', type=int, default=1000, metavar='NEPOCHS',
@@ -65,7 +62,7 @@ parser.add_argument('--train.sec_weight_decay', type=float, default=0.00, metava
 parser.add_argument('--train.patience', type=int, default=200, metavar='PATIENCE',
                     help='number of epochs to wait before validation improvement (default: 1000)')
 #Distillation
-parser.add_argument('--train.isDistill', action='store_true', default=True,
+parser.add_argument('--train.isDistill', action='store_true', default=False,
                     help='Knowledge Distillation(default: False)')
 
 # log args
@@ -75,6 +72,10 @@ parser.add_argument('--log.fields', type=str, default=default_fields, metavar='F
 default_exp_dir = 'results'
 parser.add_argument('--log.exp_dir', type=str, default=default_exp_dir, metavar='EXP_DIR',
                     help="directory where experiments should be saved (default: {:s})".format(default_exp_dir))
+#best_model_name
+default_best_name = 'best_midifew.pt'
+parser.add_argument('--log.best_name', type=str, default=default_best_name, metavar='BEST_NAME',
+                    help="the model name should be saved (default: {:s})".format(default_best_name))
 
 args = vars(parser.parse_args())
 print(args.values())
