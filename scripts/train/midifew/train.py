@@ -24,11 +24,11 @@ def main(opt):
 
 
     # save opts
-    with open(os.path.join(opt['log.exp_dir'], 'opt.json'), 'w') as f:
+    with open(os.path.join(opt['log.exp_dir'], 'preteacher_' + 'opt.json'), 'w') as f:
         json.dump(opt, f)
         f.write('\n')
 
-    trace_file = os.path.join(opt['log.exp_dir'], 'trace.txt')
+    trace_file = os.path.join(opt['log.exp_dir'], 'preteacher_'+ 'trace.txt')
 
     # Postprocess arguments
     opt['model.x_dim'] = list(map(int, opt['model.x_dim'].split(',')))
@@ -47,15 +47,8 @@ def main(opt):
         train_loader = data['train']
         val_loader = data['val']
 
-    if 'student' in opt['model.model_name']:
-        if opt['train.isDistill'] == False:
-            best_model_name = 'best_model.pt'
-        else:
-            best_model_name = 'best_model_withDistill.pt'
-    elif 'teacher' in opt['model.model_name']:
-        best_model_name = 'best_teacher_model.pt'
-    else:
-        best_model_name = opt['log.best_name']
+
+    best_model_name = opt['log.best_name']
 
     model = model_utils.load(opt)
 
@@ -80,7 +73,7 @@ def main(opt):
         for split, split_meters in meters.items():
             for field, meter in split_meters.items():
                 meter.reset()
-        state['scheduler'].step()
+        # state['scheduler'].step()
     engine.hooks['on_start_epoch'] = on_start_epoch
 
     def on_update(state):
@@ -89,9 +82,12 @@ def main(opt):
     engine.hooks['on_update'] = on_update
 
     def on_end_epoch(hook_state, state):
+        state['scheduler'].step()
         if val_loader is not None:
             if 'best_loss' not in hook_state:
                 hook_state['best_loss'] = np.inf
+            if 'best_acc' not in hook_state:
+                hook_state['best_acc'] = 0.0
             if 'wait' not in hook_state:
                 hook_state['wait'] = 0
 
@@ -111,9 +107,27 @@ def main(opt):
 
 
         if val_loader is not None:
-            if meter_vals['val']['loss'] < hook_state['best_loss']:
+            if meter_vals['val']['loss'] < hook_state['best_loss'] and meter_vals['val']['acc'] > hook_state['best_acc']:
                 hook_state['best_loss'] = meter_vals['val']['loss']
-                print("==> best model (loss = {:0.6f}), saving model...".format(hook_state['best_loss']))
+                if meter_vals['val']['acc'] > hook_state['best_acc']:
+                    hook_state['best_acc'] = meter_vals['val']['acc']
+                print("==> total best model (loss = {:0.6f}), saving model...".format(hook_state['best_loss']))
+
+                state['model'].cpu()
+
+                torch.save(state['model'], os.path.join(opt['log.exp_dir'], best_model_name))
+
+                if opt['data.cuda']:
+                    state['model'].cuda()
+
+                    if state['sec_model']:
+                        state['sec_model'].cuda()
+
+                hook_state['wait'] = 0
+
+            elif meter_vals['val']['acc'] > hook_state['best_acc']:
+                hook_state['best_acc'] = meter_vals['val']['acc']
+                print("==> best model (acc = {:0.6f}), saving model...".format(hook_state['best_acc']))
 
                 state['model'].cpu()
 
@@ -135,9 +149,6 @@ def main(opt):
         else:
             state['model'].cpu()
 
-            if state['sec_model']:
-                state['sec_model'].cpu()
-                torch.save(state['model'], os.path.join(opt['log.exp_dir'], best_sec_model))
 
             torch.save(state['model'], os.path.join(opt['log.exp_dir'], best_model_name))
 
@@ -149,8 +160,9 @@ def main(opt):
 
     engine.hooks['on_end_epoch'] = partial(on_end_epoch, {})
 
-    teacher_model = None if 'student' in best_model_name or opt['train.isDistill'] == False else torch.load(os.path.join(opt['log.exp_dir'], 'best_teacher_model.pt'))
-
+    teacher_model = torch.load(os.path.join(opt['log.exp_dir'], 'best_teacher_model.pt')) if 'student' in best_model_name and opt['train.isDistill'] == True else None
+    if teacher_model is not None:
+        teacher_model.eval()
 
     engine.train(
         teacher_model=teacher_model,

@@ -1,4 +1,5 @@
 from tqdm import tqdm
+import torch
 
 class Engine(object):
     def __init__(self):
@@ -40,11 +41,18 @@ class Engine(object):
                 state['optimizer'].zero_grad()
 
                 loss, state['output'] = state['model'].loss(sample=state['sample'],
-                                                            teacher_model=state['teacher_moder'])
+                                                            teacher_model=state['teacher_moder'],
+                                                            y_cache=None)
                 self.hooks['on_forward'](state)
 
                 loss.backward()
+                # torch.nn.utils.clip_grad_norm(state['model'].parameters(), 0.5)
                 self.hooks['on_backward'](state)
+
+                # for param in kwargs['model'].parameters():
+                #     print('{}:grad->{}'.format(param, param.grad))
+                #
+                # print(111111111111111)
 
                 state['optimizer'].step()
 

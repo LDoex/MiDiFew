@@ -50,12 +50,18 @@ def extract_episode(n_support, n_query, d):
 
 def convert_tensor(key, d):
     #d[key] = 1.0 - torch.from_numpy(np.array(d[key], np.float32, copy=False)).transpose(0, 1).contiguous().view(d[key].shape[0], d[key].shape[1])
-    d[key] = torch.from_numpy(np.array(d[key], np.float32, copy=False)).transpose(0, 1).contiguous().view(d[key].shape[0], d[key].shape[1])
+    # d[key] = torch.from_numpy(np.array(d[key], np.float32, copy=False)).transpose(0, 1).contiguous().view(d[key].shape[0], d[key].shape[1]) #1d
+    d[key] = torch.from_numpy(np.array(d[key], np.float32, copy=False)).transpose(0, 1).contiguous().view(1, d[key].shape[0], d[key].shape[1]) #2d
     return d
 
 def scale_data(key, d):
     d[key] = d[key][:-1]
-    d[key] = d[key].reshape(1, (d[key].shape[0]))
+
+    if d[key].size(0)<324:
+        zero = torch.zeros([324-d[key].size(0)])
+        d[key] = torch.cat([d[key],zero], 0)
+    d[key] = d[key].unsqueeze(0).view(18, 18) #2d
+    # d[key] = d[key].reshape(1, (d[key].shape[0])) #1d
     return d
 
 def load_class_data(dataset, d):
@@ -74,7 +80,7 @@ def load_class_data(dataset, d):
                                         partial(scale_data, 'data'),
                                         partial(convert_tensor, 'data')]))
 
-    loader = torch.utils.data.DataLoader(data_ds, batch_size=20, shuffle=False)
+    loader = torch.utils.data.DataLoader(data_ds, batch_size=80, shuffle=False)
     for sample in loader:
         Pipeline_CACHE[d['class']] = sample['data']
         break  # only need one sample because batch size equal to dataset length
@@ -87,23 +93,23 @@ def load(opt, splits):
 
     ret = {}
 
-    for split in  splits:
-        if split in ['val', 'test'] and opt['data.test_way'] != 0:
+    for split in splits:
+        if split in ['val', 'test', 'fed_test'] and opt['data.test_way'] != 0:
             n_way = opt['data.test_way']
         else:
             n_way = opt['data.way']
 
-        if split in ['val', 'test'] and opt['data.test_shot'] != 0:
+        if split in ['val', 'test', 'fed_test'] and opt['data.test_shot'] != 0:
             n_support = opt['data.test_shot']
         else:
             n_support = opt['data.shot']
 
-        if split in ['val', 'test'] and opt['data.test_query'] != 0:
+        if split in ['val', 'test', 'fed_test'] and opt['data.test_query'] != 0:
             n_query = opt['data.test_query']
         else:
             n_query = opt['data.query']
 
-        if split in ['val', 'test']:
+        if split in ['val', 'test', 'fed_test']:
             n_episodes = opt['data.test_episodes']
         else:
             n_episodes = opt['data.train_episodes']
@@ -125,7 +131,10 @@ def load(opt, splits):
                 class_names.append(class_name.rstrip('\n'))
         ds = TransformDataset(ListDataset(class_names), transforms)
 
-        sampler = MyBatchSampler(len(ds), n_way, n_episodes)
+        if split in ['train']:
+            sampler = EpisodicBatchSampler(len(ds), n_way, n_episodes)
+        else:
+            sampler = MyBatchSampler(len(ds), n_way, n_episodes)
 
         # use num_workers=0, otherwise may receive duplicate episodes
         ret[split] = torch.utils.data.DataLoader(ds, batch_sampler=sampler, num_workers=0)

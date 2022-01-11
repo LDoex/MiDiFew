@@ -25,10 +25,29 @@ class Engine(object):
             'cur_comm_num': kwargs['cur_comm_num'],
             'client_name': kwargs['client_name'],
             'clients_best_loss': kwargs['clients_best_loss'],
+            'clients_best_acc': kwargs['clients_best_acc'],
             'clients_best_model': kwargs['clients_best_model']
         }
 
-        state['optimizer'] = state['optim_method'](state['model'].parameters(), **state['optim_config'])
+        #Hierarchical lr
+        # blocks = []
+        # for child in state['model'].children():
+        #     block_1 = list(map(id, child[0].parameters()))
+        #     block_2 = list(map(id, child[1].parameters()))
+        #     blocks.append(child[1].parameters())
+        #     blocks.append(filter(lambda p: id(p) not in block_1+block_2, child.parameters()))
+        #
+        # params = [
+        #     {"params": filter(lambda p: p.requires_grad, blocks[0]), "lr": state['optim_config']['lr']*0.5},
+        #     {"params": filter(lambda p: p.requires_grad, blocks[1])},
+        # ]
+
+        params = [
+            {"params": filter(lambda p: p.requires_grad, state['model'].parameters())}
+        ]
+        state['optimizer'] = state['optim_method'](params, **state['optim_config'])
+
+        # state['optimizer'] = state['optim_method'](state['model'].parameters(), **state['optim_config'])
 
         self.hooks['on_start'](state)
         while state['epoch'] < state['max_epoch'] and not state['stop']:
@@ -46,17 +65,13 @@ class Engine(object):
 
                 loss, state['output'] = state['model'].loss(sample=state['sample'],
                                                             teacher_model=state['teacher_moder'],
-                                                            sec_optimizer=state['sec_optimizer'],
-                                                            sec_model=state['sec_model'])
+                                                            y_cache = None)
                 self.hooks['on_forward'](state)
 
                 loss.backward()
                 self.hooks['on_backward'](state)
 
                 state['optimizer'].step()
-
-                if state['sec_optimizer']:
-                    state['sec_optimizer'].step()
 
                 state['t'] += 1
                 state['batch'] += 1
