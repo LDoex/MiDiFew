@@ -15,8 +15,8 @@ col_names = np.array(['command_address', 'response_address', 'command_memory',
 
 # 定义数据预处理函数, 按分类转换成csv
 def preHandel_data():
-    source_file = './rawData/Watertank.txt'
-    handled_files = {str(i): os.path.join('./csvData/Watertank_'+str(i)+'.csv') for i in range(8)}
+    source_file = './rawData/Watertank10%.txt'
+    handled_files = {str(i): os.path.join('./csvData/Watertank10%_'+str(i)+'.csv') for i in range(8)}
     data_files = [open(handled_file, 'w', newline='') for handled_file in handled_files.values()] # python3.x中添加newline=''这一参数使写入的文件没有多余的空行
     with open(source_file, 'r') as data_source:
         csv_reader = csv.reader(data_source)

@@ -23,7 +23,10 @@ def frames_into_csv(frames):
 
 def main(opt):
     # load model
-    model = torch.load(opt['model.model_path'])
+    if 'my.model' in opt:
+        model = opt['my.model']
+    else:
+        model = torch.load(opt['model.model_path'])
     model.eval()
 
 
@@ -35,6 +38,7 @@ def main(opt):
     # Postprocess arguments
     model_opt['model.x_dim'] = map(int, model_opt['model.x_dim'].split(','))
     model_opt['log.fields'] = model_opt['log.fields'].split(',')
+    model_opt['data.dataset'] = opt['data.dataset']
 
     # construct data
     data_opt = { 'data.' + k: v for k,v in filter_opt(model_opt, 'data').items() }
@@ -69,9 +73,35 @@ def main(opt):
 
     meters = { field: tnt.meter.AverageValueMeter() for field in model_opt['log.fields'] }
 
-    model_utils.evaluate(model, data['test'], meters, desc="test")
+    #for plot
+    file_path = os.path.join('../../../plot/')
+    y_cache = {'y_re':[], 'decision_val':[], 'predic_label':[]}
+    model_utils.evaluate(model, data['test'], meters, desc="test", y_cache=y_cache)
     # df = pd.DataFrame(data=None, columns=['loss','accuracy','precision','recall','f1-score'])
     # temp = []
+    re_file = os.path.join(file_path, 'y_real_'+opt['file.suffixName']+'.csv')
+    decision_val_file = os.path.join(file_path, 'decision_val_'+opt['file.suffixName']+'.csv')
+    preLabel_file = os.path.join(file_path, 'predLabel_'+opt['file.suffixName']+'.csv')
+
+    if os.path.isfile(re_file):
+        os.remove(re_file)
+        os.remove(decision_val_file)
+        os.remove(preLabel_file)
+
+
+    f1 = open(re_file, 'a', newline='')
+    writer1 = csv.writer(f1)
+    writer1.writerows(y_cache['y_re'][0].reshape(-1,1).tolist())
+    f3 = open(decision_val_file, 'a', newline='')
+    writer3 = csv.writer(f3)
+    writer3.writerows(y_cache['decision_val'][0].tolist())
+    f4 = open(preLabel_file, 'a', newline='')
+    writer4 = csv.writer(f4)
+    writer4.writerows(y_cache['predic_label'][0].reshape(-1,1).tolist())
+    f1.close()
+    f3.close()
+    f4.close()
+
 
     for field,meter in meters.items():
         mean, std = meter.value()

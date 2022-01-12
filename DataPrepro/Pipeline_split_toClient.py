@@ -5,14 +5,24 @@ import os
 from sklearn.model_selection import train_test_split
 from DataPrepro.utils import splitToClient
 
-client_num = 5
+client_num = 7
 class_num = 8
 class_list = [i for i in range(class_num)]
-File_names = {str(i): os.path.join('./csvData/Pipeline_'+str(i)+'.csv') for i in range(class_num)}
+#File_names = {str(i): os.path.join('./csvData/Pipeline_'+str(i)+'.csv') for i in range(class_num)}
+
+Train_file = pd.read_csv('./csvData/Pipeline_Train.csv')
+Test_file = pd.read_csv('./csvData/Pipeline_Test.csv')
+
+Train_suffle = Train_file.sample(frac=1)
+Test_suffle = Test_file.sample(frac=1)
+
 TrainOutput_paths = {str(i): os.path.join('./csvData/Pipeline_client_raw_data/client{}'.format(i))
                      for i in range(client_num)}
 TestOutput_paths = {str(i): os.path.join('./csvData/Pipeline_client_raw_data/client{}'.format(i))
                      for i in range(client_num)}
+
+num_perTrain = Train_suffle.shape[0]//client_num
+num_perTest = Test_suffle.shape[0]//client_num
 
 #初始化路径文件夹
 for key in TrainOutput_paths.keys():

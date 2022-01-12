@@ -16,9 +16,10 @@ from MiDiFewNets.fed_engine import Engine
 import MiDiFewNets.utils.data as data_utils
 import MiDiFewNets.utils.model as model_utils
 import MiDiFewNets.utils.log as log_utils
+import MiDiFewNets.utils.transfer_model as transfer_model
 
 
-def fed_train_main(opt, net, global_parameters, client_name, comm_num, clients_best_model, clients_best_loss):
+def fed_train_main(opt, net, global_parameters, client_name, comm_num, clients_best_model, clients_best_loss, clients_best_acc):
     if not os.path.isdir(opt['log.exp_dir']):
         os.makedirs(opt['log.exp_dir'])
 
@@ -35,11 +36,11 @@ def fed_train_main(opt, net, global_parameters, client_name, comm_num, clients_b
         torch.cuda.manual_seed(1234)
 
     if opt['data.trainval']:
-        data = data_utils.load(opt, ['trainval'])
+        data = data_utils.fed_load(opt, ['trainval'], client_name)
         train_loader = data['trainval']
         val_loader = None
     else:
-        data = data_utils.load(opt, ['train', 'val'])
+        data = data_utils.fed_load(opt, ['train', 'val'], client_name)
         train_loader = data['train']
         val_loader = data['val']
 
@@ -57,6 +58,13 @@ def fed_train_main(opt, net, global_parameters, client_name, comm_num, clients_b
     best_model_name = 'best_local_model.pt'
     model = net
     model.load_state_dict(global_parameters, strict=True)
+    #model = transfer_model.freezParam(model)
+    model.train(mode=True)
+
+
+    # for child in net.children():
+    #     for param in child.parameters():
+    #         print(param.requires_grad)
 
     if opt['data.cuda']:
         model.cuda()
@@ -78,7 +86,7 @@ def fed_train_main(opt, net, global_parameters, client_name, comm_num, clients_b
         for split, split_meters in meters.items():
             for field, meter in split_meters.items():
                 meter.reset()
-        state['scheduler'].step()
+
     engine.hooks['on_start_epoch'] = on_start_epoch
 
     def on_update(state):
@@ -87,6 +95,7 @@ def fed_train_main(opt, net, global_parameters, client_name, comm_num, clients_b
     engine.hooks['on_update'] = on_update
 
     def on_end_epoch(hook_state, state):
+        state['scheduler'].step()
         if val_loader is not None:
             # if 'best_loss' not in hook_state:
             #     hook_state['best_loss'] = np.inf
@@ -111,8 +120,9 @@ def fed_train_main(opt, net, global_parameters, client_name, comm_num, clients_b
 
 
         if val_loader is not None:
-            if meter_vals['val']['loss'] < state['clients_best_loss'][state['client_name']]:
+            if meter_vals['val']['loss'] < state['clients_best_loss'][state['client_name']] and meter_vals['val']['acc'] > state['clients_best_acc'][state['client_name']]:
                 state['clients_best_loss'][state['client_name']] = meter_vals['val']['loss']
+                state['clients_best_acc'][state['client_name']] = meter_vals['val']['acc']
                 print("==> best model (loss = {:0.6f}), saving model...".format(state['clients_best_loss'][state['client_name']]))
             # if meter_vals['val']['loss'] < hook_state['best_loss']:
             #     hook_state['best_loss'] = meter_vals['val']['loss']
@@ -121,17 +131,26 @@ def fed_train_main(opt, net, global_parameters, client_name, comm_num, clients_b
                 state['clients_best_model'][state['client_name']] = state['model'].state_dict()
                 state['model'].cpu()
 
-                # save the second model if it exists
-                if state['sec_model']:
-                    state['sec_model'].cpu()
-                    torch.save(state['sec_model'], os.path.join(opt['log.exp_dir'], best_sec_model))
+                torch.save(state['model'], os.path.join(opt['log.exp_dir'], client_name+'_'+best_model_name))
+
+                if opt['data.cuda']:
+                    state['model'].cuda()
+
+                hook_state['wait'] = 0
+            elif meter_vals['val']['acc'] > state['clients_best_acc'][state['client_name']]:
+                state['clients_best_acc'][state['client_name']] = meter_vals['val']['acc']
+                print("==> best model (acc = {:0.6f}), saving model...".format(state['clients_best_acc'][state['client_name']]))
+            # if meter_vals['val']['loss'] < hook_state['best_loss']:
+            #     hook_state['best_loss'] = meter_vals['val']['loss']
+            #     print("==> best model (loss = {:0.6f}), saving model...".format(hook_state['best_loss']))
+
+                state['clients_best_model'][state['client_name']] = state['model'].state_dict()
+                state['model'].cpu()
 
                 torch.save(state['model'], os.path.join(opt['log.exp_dir'], client_name+'_'+best_model_name))
 
                 if opt['data.cuda']:
                     state['model'].cuda()
-                    if state['sec_model']:
-                        state['sec_model'].cuda()
 
                 hook_state['wait'] = 0
             else:
@@ -143,17 +162,11 @@ def fed_train_main(opt, net, global_parameters, client_name, comm_num, clients_b
         else:
             state['model'].cpu()
 
-            # save the second model if it exists
-            if state['sec_model']:
-                state['sec_model'].cpu()
-                torch.save(state['sec_model'], os.path.join(opt['log.exp_dir'], best_sec_model))
-
             torch.save(state['model'], os.path.join(opt['log.exp_dir'], client_name+best_model_name))
 
             if opt['data.cuda']:
                 state['model'].cuda()
-                if state['sec_model']:
-                    state['sec_model'].cuda()
+
 
     engine.hooks['on_end_epoch'] = partial(on_end_epoch, {})
 
@@ -165,16 +178,14 @@ def fed_train_main(opt, net, global_parameters, client_name, comm_num, clients_b
     return engine.train(
         teacher_model=teacher_model,
         model=model,
-        sec_model=sec_model,
         loader=train_loader,
         optim_method=getattr(optim, opt['train.optim_method']),
         optim_config={'lr': opt['train.learning_rate'],
                       'weight_decay': opt['train.weight_decay']},
-        sec_optim_config={'lr': opt['train.sec_learning_rate'],
-                          'weight_decay': opt['train.sec_weight_decay']},
         max_epoch=opt['train.epochs'],
         cur_comm_num=comm_num,
         client_name=client_name,
         clients_best_loss=clients_best_loss,
+        clients_best_acc=clients_best_acc,
         clients_best_model=clients_best_model
     )

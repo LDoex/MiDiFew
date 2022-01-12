@@ -21,7 +21,7 @@ def frames_into_csv(frames):
         writer = csv.DictWriter(csv_file, fieldnames = header)
         writer.writerows(reader)
 
-def fed_eval_main(opt, net):
+def fed_eval_main(classFile_name ,opt, net):
     # load model
     model = net
 
@@ -65,7 +65,7 @@ def fed_eval_main(opt, net):
     if data_opt['data.cuda']:
         torch.cuda.manual_seed(1234)
 
-    data = data_utils.load(data_opt, ['test'])
+    data = data_utils.load(data_opt, [classFile_name])
 
     if data_opt['data.cuda']:
         model.cuda()
@@ -73,7 +73,7 @@ def fed_eval_main(opt, net):
     meters = {'val': None}
     meters['val'] = { field: tnt.meter.AverageValueMeter() for field in model_opt['log.fields'] }
 
-    model_utils.evaluate(model, data['test'], meters['val'], desc="test")
+    model_utils.evaluate(model, data[classFile_name], meters['val'], desc="test")
     # df = pd.DataFrame(data=None, columns=['loss','accuracy','precision','recall','f1-score'])
     # temp = []
 

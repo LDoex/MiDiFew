@@ -45,13 +45,13 @@ class EpisodicBatchSampler(object):
 
     def __iter__(self):
         for i in range(self.n_episodes):
-            yield torch.cat((torch.zeros(1).long(),
-                             # torch.ones(1).long(),
-                             torch.from_numpy
-                             (np.array
-                              (random.sample(range(1,self.n_classes),self.n_way-1))).long())) #replace by oyyk, solid first num n_classes是文件总数即上限 n_way是抽取多少个
+            # yield torch.cat((torch.zeros(1).long(),
+            #                  # torch.ones(1).long(),
+            #                  torch.from_numpy
+            #                  (np.array
+            #                   (random.sample(range(1,self.n_classes),self.n_way-1))).long())) #replace by oyyk, solid first num n_classes是文件总数即上限 n_way是抽取多少个
             # #for binary class test
             # # yield torch.cat((torch.zeros(1).long(),
             # #                  torch.zeros(1).long()))
 
-            # yield torch.randperm(self.n_classes)[:self.n_way]
+            yield torch.randperm(self.n_classes)[:self.n_way]
